@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Env
+.env
+.env.*
+
+# Icons source (keep generated ones)
+src-tauri/icons/source-icon.png
+src-tauri/icons/icon.iconset/

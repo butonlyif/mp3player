@@ -1,0 +1,67 @@
+:root {
+  /* ===== 深色模式（默认）—— 实色高对比度 ===== */
+
+  /* 背景 —— 完全实色 */
+  --bg: #1a1816;
+  --bg-elevated: #242220;
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-active: rgba(255, 255, 255, 0.14);
+
+  /* 文字 —— 纯白 */
+  --text: #ffffff;
+  --text-muted: #9e9890;
+
+  /* 强调色 —— 暖橙 */
+  --accent: #e89a4e;
+  --accent-soft: rgba(232, 154, 78, 0.16);
+  --accent-hover: #f0aa5e;
+
+  /* 边框 */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* 歌词 */
+  --lyric-active: var(--accent);
+  --lyric-idle: rgba(158, 152, 144, 0.45);
+
+  /* 圆角 */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
+
+  /* 阴影 */
+  --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 6px 28px rgba(0, 0, 0, 0.45);
+
+  /* 字体 */
+  --font: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+
+  /* 尺寸 */
+  --titlebar-h: 38px;
+  --playerbar-h: 80px;
+  --sidebar-w: 210px;
+}
+
+/* ===== 浅色模式 ===== */
+:root.light {
+  --bg: #f5f2ed;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+
+  --text: #1a1816;
+  --text-muted: #5c564c;
+
+  --accent: #c05820;
+  --accent-soft: rgba(192, 88, 32, 0.10);
+  --accent-hover: #d06830;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  --lyric-active: var(--accent);
+  --lyric-idle: rgba(92, 86, 76, 0.45);
+
+  --shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 6px 28px rgba(0, 0, 0, 0.12);
+}
