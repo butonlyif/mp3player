@@ -3,12 +3,13 @@ import { audioEngine } from '../audio/AudioEngine';
 import { AudioReactiveAnalyzer, MoodEngine } from '../audio/reactiveAnalysis';
 import { ParticleField } from '../visualizer/ParticleField';
 import { extractCoverPalette, fallbackPalette } from '../visualizer/palette';
+import { stripAudioExtension } from '../visualizer/trackPresentation';
 
 interface ImmersiveVisualizerProps {
   trackKey: string;
   title: string;
-  artist: string | null;
   lyric: string | null;
+  nextLyric: string | null;
   coverArt: string | null;
   isPlaying: boolean;
   motionEnabled: boolean;
@@ -19,7 +20,7 @@ interface ImmersiveVisualizerProps {
 type VisualStyle = CSSProperties & Record<`--liquid-${string}`, string>;
 
 export default function ImmersiveVisualizer({
-  trackKey, title, artist, lyric, coverArt, isPlaying, motionEnabled, onExit, onMotionChange,
+  trackKey, title, lyric, nextLyric, coverArt, isPlaying, motionEnabled, onExit, onMotionChange,
 }: ImmersiveVisualizerProps) {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -194,9 +195,9 @@ export default function ImmersiveVisualizer({
 
       <div className="liquid-metadata">
         <span className="liquid-kicker">LIQUID MEMORY</span>
-        <h1>{title}</h1>
-        {artist && <p className="liquid-artist">{artist}</p>}
-        {lyric && <p className="liquid-lyric">{lyric}</p>}
+        <h1>{stripAudioExtension(title)}</h1>
+        {lyric && <p key={lyric} className="liquid-lyric">{lyric}</p>}
+        {nextLyric && <p key={nextLyric} className="liquid-next-lyric">{nextLyric}</p>}
       </div>
     </section>
   );

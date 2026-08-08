@@ -13,8 +13,8 @@ import EqPanel from './components/EqPanel';
 import LyricsPanel from './components/LyricsPanel';
 import BatchTagEditor from './components/BatchTagEditor';
 import ImmersiveVisualizer from './components/ImmersiveVisualizer';
-import { findCurrentLine } from './lyrics/LyricsScroller';
 import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
+import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPresentation';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -53,16 +53,11 @@ export default function App() {
   const setImmersiveMode = useStore((s) => s.setImmersiveMode);
   const setReactiveMotionEnabled = useStore((s) => s.setReactiveMotionEnabled);
 
-  const currentLyric = useMemo(() => {
-    if (!lyrics?.lines.length) return null;
-    if (lyrics.type === 'synced') {
-      const index = findCurrentLine(lyrics.lines, currentTime);
-      return index >= 0 ? lyrics.lines[index].text : null;
-    }
-    if (duration <= 0) return lyrics.lines[0]?.text ?? null;
-    const index = Math.min(lyrics.lines.length - 1, Math.floor((currentTime / duration) * lyrics.lines.length));
-    return lyrics.lines[index]?.text ?? null;
-  }, [lyrics, currentTime, duration]);
+  const immersiveLyrics = useMemo(
+    () => getImmersiveLyrics(lyrics, currentTime, duration),
+    [lyrics, currentTime, duration],
+  );
+  const displayTitle = stripAudioExtension(currentTrack?.title ?? currentTrack?.file_name ?? '未播放');
 
   useEffect(() => {
     if (!immersiveMode) return;
@@ -279,9 +274,9 @@ export default function App() {
           {immersiveMode && currentTrack ? (
             <ImmersiveVisualizer
               trackKey={String(currentTrack.id)}
-              title={currentTrack.title ?? currentTrack.file_name}
-              artist={currentTrack.artist}
-              lyric={currentLyric}
+              title={displayTitle}
+              lyric={immersiveLyrics.current}
+              nextLyric={immersiveLyrics.next}
               coverArt={coverArt}
               isPlaying={isPlaying}
               motionEnabled={reactiveMotionEnabled}
@@ -305,7 +300,7 @@ export default function App() {
         currentTime={currentTime}
         duration={duration}
         volume={volume}
-        title={currentTrack?.title ?? currentTrack?.file_name ?? null}
+        title={currentTrack ? displayTitle : null}
         artist={currentTrack?.artist ?? null}
         album={currentTrack?.album ?? null}
         coverArt={coverArt}
