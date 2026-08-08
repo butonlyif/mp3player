@@ -1,5 +1,6 @@
 // ===== 自定义标题栏（decorations:false，程序化拖拽） =====
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { APP_NAME } from '../branding';
 
 const appWindow = getCurrentWindow();
 
@@ -16,7 +17,7 @@ export default function TitleBar() {
     <div className="titlebar" onMouseDown={handleDragStart}>
       {/* 左侧拖拽区 */}
       <div className="titlebar-left">
-        <span className="titlebar-title">Peter Player</span>
+        <span className="titlebar-title">{APP_NAME}</span>
       </div>
 
       {/* 右侧窗口控制按钮 */}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Peter Player",
+  "productName": "Soul Play",
   "version": "0.1.0",
   "identifier": "com.lumen.player",
   "build": {
@@ -15,7 +15,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Peter Player",
+        "title": "Soul Play",
         "width": 1100,
         "height": 720,
         "minWidth": 800,
