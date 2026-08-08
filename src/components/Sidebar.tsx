@@ -1,5 +1,5 @@
 // ===== 左侧导航栏 =====
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useStore, type LibraryMode } from '../store/useStore';
 import { api } from '../lib/api';
@@ -20,6 +20,7 @@ export default function Sidebar() {
   const setPlaylists = useStore((s) => s.setPlaylists);
   const setCurrentPlaylistId = useStore((s) => s.setCurrentPlaylistId);
   const setPlaylistTracks = useStore((s) => s.setPlaylistTracks);
+  const setTracks = useStore((s) => s.setTracks);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
 
   const [busy, setBusy] = useState(false);
@@ -29,6 +30,7 @@ export default function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null);
   const [renaming, setRenaming] = useState<Playlist | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const memoryRequest = useRef(0);
 
   // 监听扫描进度事件
   useEffect(() => {
@@ -112,7 +114,22 @@ export default function Sidebar() {
 
   // 切换到音乐库视图
   const handleLibraryClick = () => {
+    memoryRequest.current += 1;
     setView('library');
+    refreshLibrary();
+  };
+
+  const handleMemoryClick = async (mode: 'recent' | 'frequent') => {
+    const requestId = ++memoryRequest.current;
+    setView(mode);
+    setLibraryMode('filename');
+    setSearchQuery('');
+    try {
+      const memoryTracks = await api.playback.queryMemory(mode);
+      if (requestId === memoryRequest.current) setTracks(memoryTracks);
+    } catch (e) {
+      console.error('加载听歌记忆失败:', e);
+    }
   };
 
   // 右键菜单
@@ -176,6 +193,7 @@ export default function Sidebar() {
               onClick={() => {
                 setView('library');
                 setLibraryMode(btn.key);
+                refreshLibrary();
               }}
             >
               {btn.label}
@@ -192,6 +210,20 @@ export default function Sidebar() {
         >
           <span className="sidebar-nav-icon">♪</span>
           <span>音乐库</span>
+        </button>
+        <button
+          className={`sidebar-nav-btn ${view === 'recent' ? 'active' : ''}`}
+          onClick={() => handleMemoryClick('recent')}
+        >
+          <span className="sidebar-nav-icon">◷</span>
+          <span>最近播放</span>
+        </button>
+        <button
+          className={`sidebar-nav-btn ${view === 'frequent' ? 'active' : ''}`}
+          onClick={() => handleMemoryClick('frequent')}
+        >
+          <span className="sidebar-nav-icon">↟</span>
+          <span>常听</span>
         </button>
         <input
           type="search"

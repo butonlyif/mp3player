@@ -61,6 +61,7 @@ function buildFolderTree(tracks: Track[]): TreeNode {
 // ============================================================
 export default function LibraryView() {
   const tracks = useStore((s) => s.tracks);
+  const view = useStore((s) => s.view);
   const libraryMode = useStore((s) => s.libraryMode);
   const searchQuery = useStore((s) => s.searchQuery);
   const sortBy = useStore((s) => s.sortBy);
@@ -104,6 +105,7 @@ export default function LibraryView() {
         (t.album?.toLowerCase().includes(q) ?? false)
       );
     }
+    if (view === 'recent' || view === 'frequent') return [...result];
     const dir = sortOrder === 'asc' ? 1 : -1;
     return [...result].sort((a, b) => {
       const va = getSortValue(a, sortBy);
@@ -112,7 +114,7 @@ export default function LibraryView() {
       if (va > vb) return 1 * dir;
       return 0;
     });
-  }, [tracks, debouncedSearch, sortBy, sortOrder]);
+  }, [tracks, debouncedSearch, sortBy, sortOrder, view]);
 
   const visibleIds = useMemo(() => visibleTracks.map(t => t.id), [visibleTracks]);
   const nowPlayingId = currentTrack?.id ?? null;
@@ -215,7 +217,9 @@ export default function LibraryView() {
         {/* 工具栏（常驻显示） */}
         <div className="library-toolbar">
           <span className="library-track-count text-muted">
-            共 {visibleTracks.length} 首{searchQuery ? ` · 搜索 "${searchQuery}"` : ''}
+            {view === 'recent' ? '最近播放' : view === 'frequent' ? '常听' : `共 ${visibleTracks.length} 首`}
+            {(view === 'recent' || view === 'frequent') ? ` · ${visibleTracks.length} 首` : ''}
+            {searchQuery ? ` · 搜索 "${searchQuery}"` : ''}
           </span>
           <div className="library-toolbar-right">
             {/* 选中时显示操作按钮 */}

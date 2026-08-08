@@ -16,6 +16,7 @@ import ImmersiveVisualizer from './components/ImmersiveVisualizer';
 import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
 import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPresentation';
 import { usePlaybackShortcuts } from './keyboard/usePlaybackShortcuts';
+import { usePlaybackMemory } from './listening/usePlaybackMemory';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -238,8 +239,9 @@ export default function App() {
   // ===== 控制函数 =====
   const handleTogglePlay = () => setIsPlaying(!isPlaying);
   const handleSeek = (time: number) => {
-    audioEngine.seek(time);
-    useStore.getState().setCurrentTime(time);
+    const didSeek = audioEngine.seek(time);
+    if (didSeek) useStore.getState().setCurrentTime(time);
+    return didSeek;
   };
 
   usePlaybackShortcuts({
@@ -261,6 +263,14 @@ export default function App() {
     toggleLyrics,
     toggleEq,
     closeBatchTag: () => setShowBatchTag(false),
+  });
+
+  usePlaybackMemory({
+    trackId: currentTrackId,
+    isPlaying,
+    currentTime,
+    duration,
+    seek: handleSeek,
   });
 
   // 标签更新后刷新数据
@@ -296,7 +306,7 @@ export default function App() {
               onExit={() => setImmersiveMode(false)}
               onMotionChange={setReactiveMotionEnabled}
             />
-          ) : view === 'library' ? <LibraryView /> : <PlaylistView />}
+          ) : view === 'playlist' ? <PlaylistView /> : <LibraryView />}
         </main>
 
         {/* 浮层面板（EQ 或歌词） */}

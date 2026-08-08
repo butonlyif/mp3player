@@ -171,10 +171,10 @@ export class AudioEngine {
   }
 
   /** 跳转到指定时间（秒） */
-  seek(time: number): void {
-    if (isFinite(this.audio.duration)) {
-      this.audio.currentTime = time;
-    }
+  seek(time: number): boolean {
+    if (!isFinite(this.audio.duration)) return false;
+    this.audio.currentTime = time;
+    return true;
   }
 
   // ===== 音量 =====

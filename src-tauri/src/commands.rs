@@ -182,6 +182,36 @@ pub fn library_get_track_path(
         .ok_or_else(|| format!("曲目 {track_id} 不存在"))
 }
 
+/// 保存播放进度；meaningful_play 每个播放会话最多传 true 一次。
+#[tauri::command]
+pub fn playback_record(
+    track_id: i64,
+    position: f64,
+    meaningful_play: bool,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    db::record_playback_memory(&conn, track_id, position, meaningful_play).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn playback_get_resume(
+    track_id: i64,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<Option<f64>, String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    db::get_resume_position(&conn, track_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn playback_query_memory(
+    mode: String,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<Vec<Track>, String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    db::query_memory_tracks(&conn, &mode).map_err(|e| e.to_string())
+}
+
 /// 读取单个曲目的完整标签（含歌词、封面 base64），用于编辑器预填充
 #[tauri::command]
 pub fn library_get_track_tags(

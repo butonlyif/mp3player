@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import type { Track, Playlist, ParsedLyrics } from '../lib/api';
 
 // ---------- 类型别名 ----------
-export type View = 'library' | 'playlist';
+export type View = 'library' | 'playlist' | 'recent' | 'frequent';
 export type LibraryMode = 'filename' | 'album' | 'folder';
 export type PlayMode = 'sequence' | 'shuffle' | 'repeat-one';
 export type SortOrder = 'asc' | 'desc';

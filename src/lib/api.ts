@@ -174,6 +174,18 @@ export const api = {
       invoke<void>('eq_save_preset', { preset }),
   },
 
+  /** 本地听歌记忆 */
+  playback: {
+    record: (trackId: number, position: number, meaningfulPlay: boolean) =>
+      invoke<void>('playback_record', { trackId, position, meaningfulPlay }),
+
+    getResume: (trackId: number) =>
+      invoke<number | null>('playback_get_resume', { trackId }),
+
+    queryMemory: (mode: 'recent' | 'frequent') =>
+      invoke<Track[]>('playback_query_memory', { mode }),
+  },
+
   /** 构造可播放 URL（通过 Tauri convertFileSrc） */
   streamUrl: async (trackId: number): Promise<string> => {
     const path = await api.library.getTrackPath(trackId);

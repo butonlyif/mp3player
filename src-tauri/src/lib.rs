@@ -153,6 +153,10 @@ pub fn run() {
             commands::library_get_track_path,
             commands::library_get_track_tags,
             commands::library_delete_tracks,
+            // 听歌记忆
+            commands::playback_record,
+            commands::playback_get_resume,
+            commands::playback_query_memory,
             // 播放清单
             commands::playlist_create,
             commands::playlist_rename,

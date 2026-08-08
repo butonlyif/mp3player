@@ -225,6 +225,19 @@ pub fn init_db(app_data_dir: &std::path::Path) -> rusqlite::Result<Connection> {
         CREATE INDEX IF NOT EXISTS idx_pl_position ON playlist_tracks(playlist_id, position);",
     )?;
 
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS playback_memory (
+            track_id        INTEGER PRIMARY KEY,
+            last_played     INTEGER,
+            play_count      INTEGER NOT NULL DEFAULT 0,
+            resume_position REAL NOT NULL DEFAULT 0,
+            updated_at      INTEGER NOT NULL,
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_memory_recent ON playback_memory(last_played DESC);
+        CREATE INDEX IF NOT EXISTS idx_memory_frequent ON playback_memory(play_count DESC, last_played DESC);",
+    )?;
+
     seed_builtin_eq(&conn)?;
     Ok(conn)
 }
@@ -747,6 +760,59 @@ fn renumber_positions(conn: &Connection, id: i64) -> rusqlite::Result<()> {
         }
     }
     Ok(())
+}
+
+// ---------- Playback memory DAO ----------
+
+pub fn record_playback_memory(
+    conn: &Connection,
+    track_id: i64,
+    position: f64,
+    meaningful_play: bool,
+) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().timestamp();
+    let increment = i64::from(meaningful_play);
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "INSERT INTO playback_memory (track_id, last_played, play_count, resume_position, updated_at)
+         VALUES (?1, CASE WHEN ?3 = 1 THEN ?2 ELSE NULL END, ?3, ?4, ?2)
+         ON CONFLICT(track_id) DO UPDATE SET
+           last_played = CASE WHEN ?3 = 1 THEN ?2 ELSE playback_memory.last_played END,
+           play_count = playback_memory.play_count + ?3,
+           resume_position = ?4,
+           updated_at = ?2",
+        params![track_id, now, increment, position.max(0.0)],
+    )?;
+    if meaningful_play {
+        tx.execute(
+            "UPDATE tracks SET play_count = play_count + 1 WHERE id = ?",
+            params![track_id],
+        )?;
+    }
+    tx.commit()
+}
+
+pub fn get_resume_position(conn: &Connection, track_id: i64) -> rusqlite::Result<Option<f64>> {
+    let mut stmt = conn.prepare("SELECT resume_position FROM playback_memory WHERE track_id = ?")?;
+    let mut rows = stmt.query(params![track_id])?;
+    Ok(rows.next()?.map(|row| row.get(0)).transpose()?)
+}
+
+pub fn query_memory_tracks(conn: &Connection, mode: &str) -> rusqlite::Result<Vec<Track>> {
+    let order = if mode == "frequent" {
+        "m.play_count DESC, m.last_played DESC"
+    } else {
+        "m.last_played DESC"
+    };
+    let sql = format!(
+        "SELECT t.* FROM tracks t JOIN playback_memory m ON m.track_id = t.id
+         WHERE m.last_played IS NOT NULL ORDER BY {order} LIMIT 100"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], row_to_track)?;
+    let mut out = Vec::new();
+    for row in rows { out.push(row?); }
+    Ok(out)
 }
 
 // ---------- EQ Preset DAO ----------
