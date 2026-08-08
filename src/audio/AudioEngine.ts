@@ -17,6 +17,7 @@ export class AudioEngine {
   private filters: BiquadFilterNode[] = [];
   private gainNode: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
+  private analyserErrorLogged = false;
 
   private _volume = 0.8;
   private _eqGains: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -74,9 +75,6 @@ export class AudioEngine {
     // 主音量节点
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = this._volume;
-    this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 256;
-    this.analyser.smoothingTimeConstant = 0.72;
 
     // 连接音频图: source → filter[0] → … → filter[9] → gain → destination
     this.source.connect(this.filters[0]);
@@ -84,8 +82,20 @@ export class AudioEngine {
       this.filters[i].connect(this.filters[i + 1]);
     }
     this.filters[this.filters.length - 1].connect(this.gainNode);
-    this.gainNode.connect(this.analyser);
-    this.analyser.connect(this.ctx.destination);
+    try {
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.72;
+      this.gainNode.connect(this.analyser);
+      this.analyser.connect(this.ctx.destination);
+    } catch (error) {
+      this.analyser = null;
+      this.gainNode.connect(this.ctx.destination);
+      if (!this.analyserErrorLogged) {
+        this.analyserErrorLogged = true;
+        console.warn('音频可视化不可用，播放将继续:', error);
+      }
+    }
   }
 
   /** 将当前频谱写入调用方复用的缓冲区。音频上下文未就绪时返回 false。 */
@@ -98,6 +108,14 @@ export class AudioEngine {
   /** 可视化所需的频谱缓冲区长度。首次播放前使用 FFT 默认值。 */
   get frequencyBinCount(): number {
     return this.analyser?.frequencyBinCount ?? 128;
+  }
+
+  get sampleRate(): number {
+    return this.ctx?.sampleRate ?? 44_100;
+  }
+
+  get analyserFftSize(): number {
+    return this.analyser?.fftSize ?? 256;
   }
 
   // ===== 回调注册 =====

@@ -23,6 +23,11 @@ export default function ImmersiveVisualizer({
 }: ImmersiveVisualizerProps) {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fieldRef = useRef<ParticleField | null>(null);
+  const analyzerRef = useRef<AudioReactiveAnalyzer | null>(null);
+  const moodRef = useRef<MoodEngine | null>(null);
+  const frequencyRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const canvasErrorLogged = useRef(false);
 
   useEffect(() => {
     let current = true;
@@ -40,43 +45,100 @@ export default function ImmersiveVisualizer({
     const root = rootRef.current;
     const canvas = canvasRef.current;
     if (!root || !canvas || !motionEnabled) return;
-
-    const field = new ParticleField(canvas);
-    const analyzer = new AudioReactiveAnalyzer(audioEngine.frequencyBinCount);
-    const moodEngine = new MoodEngine();
-    const frequencyData = new Uint8Array(new ArrayBuffer(audioEngine.frequencyBinCount));
+    let field: ParticleField;
+    try {
+      field = new ParticleField(canvas);
+      fieldRef.current = field;
+    } catch (error) {
+      if (!canvasErrorLogged.current) console.warn('粒子效果不可用，色雾将继续显示:', error);
+      canvasErrorLogged.current = true;
+      return;
+    }
     const resize = () => field.resize(root.clientWidth, root.clientHeight, window.devicePixelRatio);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
     observer?.observe(root);
     resize();
 
+    return () => {
+      observer?.disconnect();
+      field.destroy();
+      if (fieldRef.current === field) fieldRef.current = null;
+    };
+  }, [motionEnabled]);
+
+  useEffect(() => {
+    analyzerRef.current = new AudioReactiveAnalyzer(
+      audioEngine.frequencyBinCount, audioEngine.sampleRate, audioEngine.analyserFftSize,
+    );
+    moodRef.current = new MoodEngine();
+    frequencyRef.current = new Uint8Array(new ArrayBuffer(audioEngine.frequencyBinCount));
+  }, [trackKey]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !motionEnabled || !analyzerRef.current || !moodRef.current || !frequencyRef.current) return;
     let frameId = 0;
     let lastSample = 0;
-    let hidden = document.hidden;
     const stopAt = isPlaying ? Infinity : performance.now() + 800;
-    const onVisibility = () => { hidden = document.hidden; };
-    document.addEventListener('visibilitychange', onVisibility);
+    let active = true;
 
     const frame = (now: number) => {
-      frameId = requestAnimationFrame(frame);
-      if (hidden || now - lastSample < 33 || now > stopAt) return;
+      if (!active || document.hidden || now > stopAt) {
+        if (now > stopAt) {
+          root.style.setProperty('--liquid-energy', '0');
+          root.style.setProperty('--liquid-bass', '0');
+          root.style.setProperty('--liquid-mid', '0');
+          root.style.setProperty('--liquid-scale', '1');
+          root.style.setProperty('--liquid-cover-opacity', '0.1');
+          root.style.setProperty('--liquid-fog-opacity', '0.3');
+          fieldRef.current?.clear();
+        }
+        return;
+      }
+      if (now - lastSample < 33) {
+        frameId = requestAnimationFrame(frame);
+        return;
+      }
       const dt = lastSample ? now - lastSample : 33;
       lastSample = now;
-      if (!audioEngine.getFrequencyData(frequencyData)) return;
-      const signal = analyzer.update(frequencyData, now);
-      const mood = moodEngine.update(signal, dt);
+      const frequencyData = frequencyRef.current!;
+      if (isPlaying) audioEngine.getFrequencyData(frequencyData);
+      else frequencyData.fill(0);
+      const signal = analyzerRef.current!.update(frequencyData, now);
+      const mood = moodRef.current!.update(signal, dt);
       root.style.setProperty('--liquid-energy', signal.energy.toFixed(3));
       root.style.setProperty('--liquid-bass', signal.bass.toFixed(3));
       root.style.setProperty('--liquid-mid', signal.mid.toFixed(3));
-      root.dataset.mood = mood.dominant;
-      field.render(signal, mood, dt);
+      root.style.setProperty('--liquid-calm', mood.weights.calm.toFixed(3));
+      root.style.setProperty('--liquid-warm', mood.weights.warm.toFixed(3));
+      root.style.setProperty('--liquid-melancholic', mood.weights.melancholic.toFixed(3));
+      root.style.setProperty('--liquid-energetic', mood.weights.energetic.toFixed(3));
+      root.style.setProperty('--liquid-fog-opacity', (0.3 + signal.energy * 0.22 + mood.weights.energetic * 0.08).toFixed(3));
+      root.style.setProperty('--liquid-cover-opacity', (0.1 + signal.energy * 0.08).toFixed(3));
+      root.style.setProperty('--liquid-scale', (1 + signal.bass * 0.012).toFixed(4));
+      root.style.setProperty('--liquid-warm-glow', (mood.weights.warm * 0.34).toFixed(3));
+      root.style.setProperty('--liquid-energetic-glow', (mood.weights.energetic * 0.35).toFixed(3));
+      root.style.setProperty('--liquid-blue-glow', ((mood.weights.calm + mood.weights.melancholic) * 0.24).toFixed(3));
+      try {
+        fieldRef.current?.render(signal, mood, dt);
+      } catch (error) {
+        fieldRef.current?.destroy();
+        fieldRef.current = null;
+        if (!canvasErrorLogged.current) console.warn('粒子渲染已停用，色雾将继续显示:', error);
+        canvasErrorLogged.current = true;
+      }
+      frameId = requestAnimationFrame(frame);
     };
-    frameId = requestAnimationFrame(frame);
+    const onVisibility = () => {
+      cancelAnimationFrame(frameId);
+      if (!document.hidden && active) frameId = requestAnimationFrame(frame);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) frameId = requestAnimationFrame(frame);
     return () => {
+      active = false;
       cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibility);
-      observer?.disconnect();
-      field.destroy();
     };
   }, [isPlaying, motionEnabled, trackKey]);
 
@@ -85,6 +147,9 @@ export default function ImmersiveVisualizer({
     '--liquid-color-2': 'rgb(180 78 139)',
     '--liquid-color-3': 'rgb(38 128 132)',
     '--liquid-energy': '0', '--liquid-bass': '0', '--liquid-mid': '0',
+    '--liquid-calm': '1', '--liquid-warm': '0', '--liquid-melancholic': '0', '--liquid-energetic': '0',
+    '--liquid-fog-opacity': '0.3', '--liquid-cover-opacity': '0.1', '--liquid-scale': '1',
+    '--liquid-warm-glow': '0', '--liquid-energetic-glow': '0', '--liquid-blue-glow': '0.24',
   };
 
   return (

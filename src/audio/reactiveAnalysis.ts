@@ -16,6 +16,7 @@ export interface MoodSnapshot {
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 function average(data: Uint8Array, start: number, end: number): number {
+  if (start >= data.length || end <= start) return 0;
   let sum = 0;
   const safeEnd = Math.min(data.length, Math.max(start + 1, end));
   for (let index = start; index < safeEnd; index += 1) sum += data[index];
@@ -26,22 +27,35 @@ function smooth(current: number, target: number, attack: number, release: number
   return current + (target - current) * (target > current ? attack : release);
 }
 
+export function frequencyBandBins(binCount: number, sampleRate: number, fftSize: number) {
+  const hzPerBin = sampleRate / fftSize;
+  const binFor = (hz: number) => Math.min(binCount, Math.max(1, Math.ceil(hz / hzPerBin)));
+  return {
+    bassEnd: binFor(250),
+    midEnd: binFor(4_000),
+    trebleEnd: binFor(12_000),
+  };
+}
+
 export class AudioReactiveAnalyzer {
   private readonly snapshot: ReactiveSnapshot = { bass: 0, mid: 0, treble: 0, energy: 0, beat: 0 };
   private bassBaseline = 0.04;
   private lastBeatAt = -Infinity;
   private readonly bassEnd: number;
   private readonly midEnd: number;
+  private readonly trebleEnd: number;
 
-  constructor(binCount: number) {
-    this.bassEnd = Math.max(1, Math.round(binCount * 0.125));
-    this.midEnd = Math.max(this.bassEnd + 1, Math.round(binCount * 0.5));
+  constructor(binCount: number, sampleRate = 44_100, fftSize = binCount * 2) {
+    const bands = frequencyBandBins(binCount, sampleRate, fftSize);
+    this.bassEnd = bands.bassEnd;
+    this.midEnd = Math.max(this.bassEnd + 1, bands.midEnd);
+    this.trebleEnd = Math.max(this.midEnd + 1, bands.trebleEnd);
   }
 
   update(data: Uint8Array, nowMs: number): ReactiveSnapshot {
     const bass = average(data, 0, this.bassEnd);
     const mid = average(data, this.bassEnd, this.midEnd);
-    const treble = average(data, this.midEnd, data.length);
+    const treble = average(data, this.midEnd, this.trebleEnd);
     const energy = bass * 0.42 + mid * 0.36 + treble * 0.22;
 
     this.snapshot.bass = smooth(this.snapshot.bass, bass, 0.58, 0.12);

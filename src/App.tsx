@@ -91,23 +91,43 @@ export default function App() {
   useEffect(() => {
     if (!isPlaying || immersiveMode || !reactiveMotionEnabled) return;
     const root = document.documentElement;
-    const analyzer = new AudioReactiveAnalyzer(audioEngine.frequencyBinCount);
+    const analyzer = new AudioReactiveAnalyzer(
+      audioEngine.frequencyBinCount, audioEngine.sampleRate, audioEngine.analyserFftSize,
+    );
     const data = new Uint8Array(new ArrayBuffer(audioEngine.frequencyBinCount));
     let frameId = 0;
     let lastSample = 0;
+    let active = true;
     const frame = (now: number) => {
-      frameId = requestAnimationFrame(frame);
-      if (document.hidden || now - lastSample < 50 || !audioEngine.getFrequencyData(data)) return;
+      if (!active || document.hidden) return;
+      if (now - lastSample < 50 || !audioEngine.getFrequencyData(data)) {
+        frameId = requestAnimationFrame(frame);
+        return;
+      }
       lastSample = now;
       const signal = analyzer.update(data, now);
       root.style.setProperty('--ambient-bass', signal.bass.toFixed(3));
       root.style.setProperty('--ambient-energy', signal.energy.toFixed(3));
+      root.style.setProperty('--ambient-scale', (1 + signal.bass * 0.035).toFixed(4));
+      root.style.setProperty('--ambient-haze-opacity', (signal.energy * 0.12).toFixed(3));
+      root.style.setProperty('--ambient-glow', `${(4 + signal.energy * 14).toFixed(1)}px`);
+      frameId = requestAnimationFrame(frame);
     };
-    frameId = requestAnimationFrame(frame);
-    return () => {
+    const onVisibility = () => {
       cancelAnimationFrame(frameId);
+      if (!document.hidden && active) frameId = requestAnimationFrame(frame);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) frameId = requestAnimationFrame(frame);
+    return () => {
+      active = false;
+      cancelAnimationFrame(frameId);
+      document.removeEventListener('visibilitychange', onVisibility);
       root.style.setProperty('--ambient-bass', '0');
       root.style.setProperty('--ambient-energy', '0');
+      root.style.setProperty('--ambient-scale', '1');
+      root.style.setProperty('--ambient-haze-opacity', '0');
+      root.style.setProperty('--ambient-glow', '4px');
     };
   }, [immersiveMode, isPlaying, reactiveMotionEnabled, currentTrackId]);
 
@@ -145,6 +165,7 @@ export default function App() {
   // ===== 当前曲目变化 → 加载 + 播放 + 加载歌词 =====
   useEffect(() => {
     if (currentTrackId === null) return;
+    useStore.getState().setCoverArt(null);
 
     // 异步获取可播放 URL（convertFileSrc）
     api.streamUrl(currentTrackId)
@@ -182,7 +203,9 @@ export default function App() {
         }
       })
       .catch(() => {
-        // 无封面时清空
+        if (useStore.getState().currentTrack?.id === currentTrackId) {
+          useStore.getState().setCoverArt(null);
+        }
       });
   }, [currentTrackId]);
 

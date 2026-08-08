@@ -31,4 +31,13 @@ describe('paletteFromPixels', () => {
     const palette = paletteFromPixels(new Uint8ClampedArray(16), 'empty-cover');
     expect(palette).toEqual(fallbackPalette('empty-cover'));
   });
+
+  it('uses the whole image instead of the first distinct pixels', () => {
+    const pixels = new Uint8ClampedArray(4 * 103);
+    for (let index = 0; index < 3; index += 1) pixels.set([245, 245, 245, 255], index * 4);
+    for (let index = 3; index < 103; index += 1) pixels.set([24, 42, 96, 255], index * 4);
+
+    const palette = paletteFromPixels(pixels);
+    expect(palette.colors[0]).toBe('rgb(24 42 96)');
+  });
 });

@@ -1015,7 +1015,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   width: 34%;
   height: 70px;
   background: var(--ambient-color, var(--accent));
-  opacity: calc(var(--ambient-energy, 0) * 0.12);
+  opacity: var(--ambient-haze-opacity, 0);
   filter: blur(30px);
   pointer-events: none;
   transition: opacity 500ms ease;
@@ -1090,8 +1090,8 @@ input[type='range']::-webkit-slider-thumb:hover {
 }
 
 .playerbar.is-playing .playerbar-play-btn {
-  transform: scale(calc(1 + var(--ambient-bass, 0) * 0.035));
-  box-shadow: 0 0 calc(4px + var(--ambient-energy, 0) * 14px) color-mix(in srgb, var(--ambient-color, var(--accent)) 34%, transparent);
+  transform: scale(var(--ambient-scale, 1));
+  box-shadow: 0 0 var(--ambient-glow, 4px) color-mix(in srgb, var(--ambient-color, var(--accent)) 34%, transparent);
 }
 
 .playerbar-progress {
@@ -1153,6 +1153,10 @@ input[type='range']::-webkit-slider-thumb:hover {
   --liquid-energy: 0;
   --liquid-bass: 0;
   --liquid-mid: 0;
+  --liquid-calm: 1;
+  --liquid-warm: 0;
+  --liquid-melancholic: 0;
+  --liquid-energetic: 0;
   position: relative;
   isolation: isolate;
   flex: 1;
@@ -1170,7 +1174,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   z-index: -5;
   background-position: center;
   background-size: cover;
-  opacity: calc(0.1 + var(--liquid-energy) * 0.08);
+  opacity: var(--liquid-cover-opacity, 0.1);
   filter: blur(56px) saturate(1.45) contrast(1.05);
   transform: scale(1.18);
   transition: background-image 1.6s ease, opacity 800ms ease;
@@ -1192,7 +1196,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   z-index: -4;
   border-radius: 44% 56% 62% 38%;
   filter: blur(48px);
-  opacity: calc(0.34 + var(--liquid-energy) * 0.26);
+  opacity: var(--liquid-fog-opacity, 0.3);
   mix-blend-mode: screen;
   will-change: transform, opacity;
   transition: background 3s ease, opacity 800ms ease;
@@ -1203,6 +1207,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   top: -24%;
   background: var(--liquid-color-1);
   animation: liquid-drift-one 14s ease-in-out infinite alternate;
+  box-shadow: 0 0 150px rgb(255 160 112 / var(--liquid-warm-glow));
 }
 
 .liquid-fog-two {
@@ -1210,6 +1215,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   top: 8%;
   background: var(--liquid-color-2);
   animation: liquid-drift-two 17s ease-in-out infinite alternate;
+  box-shadow: 0 0 170px rgb(74 238 225 / var(--liquid-energetic-glow));
 }
 
 .liquid-fog-three {
@@ -1217,6 +1223,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   bottom: -45%;
   background: var(--liquid-color-3);
   animation: liquid-drift-three 19s ease-in-out infinite alternate;
+  box-shadow: 0 0 160px rgb(66 80 188 / var(--liquid-blue-glow));
 }
 
 .liquid-particles {
@@ -1308,7 +1315,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 @keyframes liquid-drift-one { to { transform: translate(26%, 18%) rotate(18deg) scale(1.12); } }
 @keyframes liquid-drift-two { to { transform: translate(-20%, 24%) rotate(-22deg) scale(1.16); } }
 @keyframes liquid-drift-three { to { transform: translate(4%, -24%) rotate(14deg) scale(1.1); } }
-@keyframes liquid-breathe { to { transform: translateY(-2%) scale(calc(1 + var(--liquid-bass) * 0.012)); } }
+@keyframes liquid-breathe { to { transform: translateY(-2%) scale(var(--liquid-scale)); } }
 
 @media (max-width: 760px) {
   .liquid-metadata { width: 86%; }

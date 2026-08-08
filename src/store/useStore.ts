@@ -124,7 +124,9 @@ export const useStore = create<AppState>((set, get) => ({
   immersiveMode: false,
   reactiveMotionEnabled: typeof window === 'undefined'
     ? true
-    : !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    : typeof window.matchMedia === 'function'
+      ? !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : true,
 
   // ===== Actions: 库 =====
   setTracks: (tracks) => set({ tracks }),

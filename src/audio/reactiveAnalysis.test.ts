@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AudioReactiveAnalyzer,
   MoodEngine,
+  frequencyBandBins,
   type ReactiveSnapshot,
 } from './reactiveAnalysis';
 
@@ -15,8 +16,12 @@ function spectrum(
 }
 
 describe('AudioReactiveAnalyzer', () => {
+  it('maps bass to real frequencies below 250 Hz', () => {
+    expect(frequencyBandBins(128, 44_100, 256)).toEqual({ bassEnd: 2, midEnd: 24, trebleEnd: 70 });
+  });
+
   it('separates bass, mid, and treble energy', () => {
-    const analyzer = new AudioReactiveAnalyzer(64);
+    const analyzer = new AudioReactiveAnalyzer(64, 16_000, 128);
     const result = analyzer.update(
       spectrum(64, [[0, 8, 255], [8, 32, 128], [32, 64, 32]]),
       0,

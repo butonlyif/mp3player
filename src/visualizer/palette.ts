@@ -31,14 +31,29 @@ export function fallbackPalette(seed: string): VisualPalette {
 }
 
 export function paletteFromPixels(pixels: Uint8ClampedArray, seed = 'cover'): VisualPalette {
-  const chosen: Array<[number, number, number]> = [];
+  const buckets = new Map<number, { count: number; red: number; green: number; blue: number }>();
   for (let index = 0; index + 3 < pixels.length; index += 4) {
     if (pixels[index + 3] < 96) continue;
-    const candidate: [number, number, number] = [pixels[index], pixels[index + 1], pixels[index + 2]];
-    const distinct = chosen.every(([r, g, b]) =>
-      Math.abs(r - candidate[0]) + Math.abs(g - candidate[1]) + Math.abs(b - candidate[2]) > 90,
-    );
-    if (distinct) chosen.push(candidate);
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const key = (red >> 5) << 6 | (green >> 5) << 3 | (blue >> 5);
+    const bucket = buckets.get(key) ?? { count: 0, red: 0, green: 0, blue: 0 };
+    bucket.count += 1;
+    bucket.red += red;
+    bucket.green += green;
+    bucket.blue += blue;
+    buckets.set(key, bucket);
+  }
+  const ranked = [...buckets.values()].sort((left, right) => right.count - left.count);
+  const chosen: Array<[number, number, number]> = [];
+  for (const bucket of ranked) {
+    const candidate: [number, number, number] = [
+      bucket.red / bucket.count, bucket.green / bucket.count, bucket.blue / bucket.count,
+    ];
+    if (chosen.every(([r, g, b]) => Math.abs(r - candidate[0]) + Math.abs(g - candidate[1]) + Math.abs(b - candidate[2]) > 72)) {
+      chosen.push(candidate);
+    }
     if (chosen.length === 3) break;
   }
   if (chosen.length === 0) return fallbackPalette(seed);

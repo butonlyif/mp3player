@@ -89,10 +89,14 @@ export class ParticleField {
     if (signal.beat) this.ringLife = 1;
     this.pool.update(signal.treble, signal.beat, dtMs, this.width, this.height);
     this.context.clearRect(0, 0, this.width, this.height);
-    const hue = mood.dominant === 'warm' ? '255 190 145' : mood.dominant === 'energetic' ? '190 245 238' : '218 205 255';
+    const weights = mood.weights;
+    const red = 190 * weights.calm + 255 * weights.warm + 154 * weights.melancholic + 190 * weights.energetic;
+    const green = 210 * weights.calm + 190 * weights.warm + 170 * weights.melancholic + 245 * weights.energetic;
+    const blue = 255 * weights.calm + 145 * weights.warm + 235 * weights.melancholic + 238 * weights.energetic;
+    const hue = `${Math.round(red)} ${Math.round(green)} ${Math.round(blue)}`;
     this.context.fillStyle = `rgb(${hue})`;
     this.pool.forEachActive((particle) => {
-      this.context!.globalAlpha = Math.max(0, particle.life) * 0.72;
+      this.context!.globalAlpha = Math.max(0, particle.life) * (0.5 + weights.energetic * 0.3);
       this.context!.beginPath();
       this.context!.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
       this.context!.fill();
