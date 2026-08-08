@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../lib/api';
 import type { Track, Playlist } from '../lib/api';
+import { folderQueue, sortAlbumQueue } from '../library/contextQueue';
 
 // ---------- 工具函数 ----------
 
@@ -131,8 +132,8 @@ export default function LibraryView() {
   };
 
   // 双击播放 —— 直接播放，不依赖播放清单
-  const handleDoubleClick = useCallback((track: Track) => {
-    playTrack(track, visibleTracks);
+  const handleDoubleClick = useCallback((track: Track, queue: Track[] = visibleTracks) => {
+    playTrack(track, queue);
   }, [playTrack, visibleTracks]);
 
   // 右键菜单
@@ -347,7 +348,7 @@ export default function LibraryView() {
 // ============================================================
 // 专辑分组模式
 // ============================================================
-function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (t: Track) => void }) {
+function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const albums = useMemo<AlbumGroup[]>(() => {
@@ -371,6 +372,7 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
       <div className="album-list">
         {albums.map(album => {
           const isExpanded = expanded.has(album.album);
+          const albumQueue = sortAlbumQueue(album.tracks);
           return (
             <div key={album.album} className="album-group">
               <div className="album-header list-row" onClick={() => toggleExpand(album.album)}>
@@ -389,11 +391,11 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
               </div>
               {isExpanded && (
                 <div className="album-tracks">
-                  {album.tracks.map(track => (
+                  {albumQueue.map(track => (
                     <div
                       key={track.id}
                       className={`album-track list-row ${nowPlayingId === track.id ? 'playing' : ''}`}
-                      onDoubleClick={() => onPlay(track)}
+                      onDoubleClick={() => onPlay(track, albumQueue)}
                     >
                       <span className="album-track-no text-muted">{track.track_no ?? '–'}</span>
                       <span className="album-track-title truncate">{track.title || track.file_name}</span>
@@ -413,7 +415,7 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
 // ============================================================
 // 文件夹树模式
 // ============================================================
-function FolderMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (t: Track) => void }) {
+function FolderMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const tree = useMemo(() => buildFolderTree(tracks), [tracks]);
   if (tracks.length === 0) return <div className="empty-state text-muted">无匹配结果</div>;
   return (
@@ -425,7 +427,7 @@ function FolderMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlay
   );
 }
 
-function FolderNode({ node, depth, nowPlayingId, onPlay }: { node: TreeNode; depth: number; nowPlayingId: number | null; onPlay: (t: Track) => void }) {
+function FolderNode({ node, depth, nowPlayingId, onPlay }: { node: TreeNode; depth: number; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const [expanded, setExpanded] = useState(false);
   const childNodes = useMemo(() => [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name)), [node.children]);
   const hasChildren = childNodes.length > 0;
@@ -451,7 +453,7 @@ function FolderNode({ node, depth, nowPlayingId, onPlay }: { node: TreeNode; dep
               key={track.id}
               className={`folder-track list-row ${nowPlayingId === track.id ? 'playing' : ''}`}
               style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
-              onDoubleClick={() => onPlay(track)}
+              onDoubleClick={() => onPlay(track, folderQueue(node.tracks))}
             >
               <span className="folder-track-icon">♪</span>
               <span className="folder-track-title truncate">{track.title || track.file_name}</span>
