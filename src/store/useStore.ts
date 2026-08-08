@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
 import type { Track, Playlist, ParsedLyrics, ResonanceLevel } from '../lib/api';
+import { sortByResonanceStable } from '../library/resonance';
 
 // ---------- 类型别名 ----------
 export type View = 'library' | 'playlist' | 'recent' | 'frequent';
@@ -16,6 +17,8 @@ const savedBoolean = (key: string, fallback: boolean) => {
 };
 
 const resonanceUpdateGeneration = new Map<number, number>();
+const resonanceWriteQueues = new Map<number, Promise<void>>();
+const resonanceConfirmedLevels = new Map<number, ResonanceLevel>();
 const updateTrackResonance = (track: Track, id: number, resonance: ResonanceLevel): Track =>
   track.id === id ? { ...track, resonance } : track;
 
@@ -187,40 +190,48 @@ export const useStore = create<AppState>((set, get) => ({
     const generation = (resonanceUpdateGeneration.get(trackId) ?? 0) + 1;
     resonanceUpdateGeneration.set(trackId, generation);
     const before = get();
-    const previous = {
-      tracks: before.tracks.find((track) => track.id === trackId)?.resonance,
-      playlistTracks: before.playlistTracks.find((track) => track.id === trackId)?.resonance,
-      playQueue: before.playQueue.find((track) => track.id === trackId)?.resonance,
-      currentTrack: before.currentTrack?.id === trackId ? before.currentTrack.resonance : undefined,
-    };
-    set((state) => ({
-      tracks: state.tracks.map((track) => updateTrackResonance(track, trackId, resonance)),
-      playlistTracks: state.playlistTracks.map((track) => updateTrackResonance(track, trackId, resonance)),
-      playQueue: state.playQueue.map((track) => updateTrackResonance(track, trackId, resonance)),
-      currentTrack: state.currentTrack
-        ? updateTrackResonance(state.currentTrack, trackId, resonance)
-        : null,
-    }));
+    if (!resonanceConfirmedLevels.has(trackId)) {
+      const baseline = before.tracks.find((track) => track.id === trackId)?.resonance
+        ?? before.currentTrack?.resonance
+        ?? 0;
+      resonanceConfirmedLevels.set(trackId, baseline);
+    }
+    const applyLevel = (level: ResonanceLevel) => set((state) => {
+      let playQueue = state.playQueue.map((track) => updateTrackResonance(track, trackId, level));
+      const activeId = state.currentTrack?.id ?? playQueue[state.playQueueIndex]?.id;
+      if (state.sortBy === 'resonance') {
+        playQueue = sortByResonanceStable(playQueue, state.sortOrder);
+      }
+      const nextIndex = activeId === undefined
+        ? state.playQueueIndex
+        : Math.max(0, playQueue.findIndex((track) => track.id === activeId));
+      return {
+        tracks: state.tracks.map((track) => updateTrackResonance(track, trackId, level)),
+        playlistTracks: state.playlistTracks.map((track) => updateTrackResonance(track, trackId, level)),
+        playQueue,
+        playQueueIndex: nextIndex,
+        currentTrack: state.currentTrack
+          ? updateTrackResonance(state.currentTrack, trackId, level)
+          : null,
+      };
+    });
+    applyLevel(resonance);
+
+    const previousWrite = resonanceWriteQueues.get(trackId) ?? Promise.resolve();
+    const write = previousWrite
+      .catch(() => undefined)
+      .then(() => api.library.updateResonance(trackId, resonance));
+    resonanceWriteQueues.set(trackId, write);
     try {
-      await api.library.updateResonance(trackId, resonance);
+      await write;
+      resonanceConfirmedLevels.set(trackId, resonance);
     } catch (error) {
       if (resonanceUpdateGeneration.get(trackId) === generation) {
-        set((state) => ({
-          tracks: previous.tracks === undefined ? state.tracks : state.tracks.map(
-            (track) => updateTrackResonance(track, trackId, previous.tracks!),
-          ),
-          playlistTracks: previous.playlistTracks === undefined ? state.playlistTracks : state.playlistTracks.map(
-            (track) => updateTrackResonance(track, trackId, previous.playlistTracks!),
-          ),
-          playQueue: previous.playQueue === undefined ? state.playQueue : state.playQueue.map(
-            (track) => updateTrackResonance(track, trackId, previous.playQueue!),
-          ),
-          currentTrack: state.currentTrack && previous.currentTrack !== undefined
-            ? updateTrackResonance(state.currentTrack, trackId, previous.currentTrack)
-            : state.currentTrack,
-        }));
+        applyLevel(resonanceConfirmedLevels.get(trackId) ?? 0);
+        throw error;
       }
-      throw error;
+    } finally {
+      if (resonanceWriteQueues.get(trackId) === write) resonanceWriteQueues.delete(trackId);
     }
   },
 

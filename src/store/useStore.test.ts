@@ -79,6 +79,45 @@ describe('track resonance state', () => {
     expect(useStore.getState().currentTrack?.resonance).toBe(1);
     expect(useStore.getState().playQueue[0].resonance).toBe(1);
   });
+
+  it('serializes rapid changes and rolls back to the last confirmed database value', async () => {
+    const rejects: Array<(error: Error) => void> = [];
+    vi.spyOn(api.library, 'updateResonance').mockImplementation(
+      () => new Promise<void>((_, reject) => rejects.push(reject)),
+    );
+    const original = track(7, 0);
+    useStore.setState({ tracks: [original], playlistTracks: [], currentTrack: original, playQueue: [original] });
+
+    const first = useStore.getState().setTrackResonance(7, 1);
+    const second = useStore.getState().setTrackResonance(7, 2);
+    await vi.waitFor(() => expect(api.library.updateResonance).toHaveBeenCalledTimes(1));
+    rejects[0](new Error('first failed'));
+    await vi.waitFor(() => expect(api.library.updateResonance).toHaveBeenCalledTimes(2));
+    rejects[1](new Error('second failed'));
+    await Promise.allSettled([first, second]);
+
+    expect(useStore.getState().tracks[0].resonance).toBe(0);
+  });
+
+  it('reorders a resonance-sorted play queue and keeps the active track index', async () => {
+    vi.spyOn(api.library, 'updateResonance').mockResolvedValue(undefined);
+    const first = track(11, 3);
+    const active = track(12, 2);
+    const last = track(13, 1);
+    useStore.setState({
+      tracks: [first, active, last],
+      playQueue: [first, active, last],
+      playQueueIndex: 1,
+      currentTrack: active,
+      sortBy: 'resonance',
+      sortOrder: 'desc',
+    });
+
+    await useStore.getState().setTrackResonance(13, 3);
+
+    expect(useStore.getState().playQueue.map((item) => item.id)).toEqual([11, 13, 12]);
+    expect(useStore.getState().playQueueIndex).toBe(2);
+  });
 });
 
 describe('resonance sorting', () => {

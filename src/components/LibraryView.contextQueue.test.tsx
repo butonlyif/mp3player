@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 describe('LibraryView contextual playback queues', () => {
-  it('merges filename fallback into the title column and isolates resonance clicks', () => {
+  it('merges filename fallback into the title column and isolates resonance clicks', async () => {
     vi.spyOn(api.library, 'updateResonance').mockResolvedValue(undefined);
     useStore.setState({
       libraryMode: 'filename',
@@ -63,7 +63,7 @@ describe('LibraryView contextual playback queues', () => {
     expect(screen.queryByText('文件名')).not.toBeInTheDocument();
     expect(screen.getByText('Fallback.demo')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '共鸣 · 点击修改' }));
-    expect(api.library.updateResonance).toHaveBeenCalledWith(9, 3);
+    await vi.waitFor(() => expect(api.library.updateResonance).toHaveBeenCalledWith(9, 3));
     expect(useStore.getState().selectedTrackIds.size).toBe(0);
     expect(useStore.getState().playQueue).toEqual([]);
   });
