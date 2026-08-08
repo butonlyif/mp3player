@@ -15,6 +15,7 @@ import BatchTagEditor from './components/BatchTagEditor';
 import ImmersiveVisualizer from './components/ImmersiveVisualizer';
 import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
 import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPresentation';
+import { usePlaybackShortcuts } from './keyboard/usePlaybackShortcuts';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -58,15 +59,6 @@ export default function App() {
     [lyrics, currentTime, duration],
   );
   const displayTitle = stripAudioExtension(currentTrack?.title ?? currentTrack?.file_name ?? '未播放');
-
-  useEffect(() => {
-    if (!immersiveMode) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setImmersiveMode(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [immersiveMode, setImmersiveMode]);
 
   // 日常模式只更新根节点 CSS 变量，不触发 React 高频渲染。
   useEffect(() => {
@@ -249,6 +241,27 @@ export default function App() {
     audioEngine.seek(time);
     useStore.getState().setCurrentTime(time);
   };
+
+  usePlaybackShortcuts({
+    hasTrack: currentTrack !== null,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    immersiveMode,
+    showBatchTag,
+    showLyrics,
+    showEq,
+    setPlaying: setIsPlaying,
+    seek: handleSeek,
+    previous: playPrev,
+    next: playNext,
+    setVolume,
+    setImmersiveMode,
+    toggleLyrics,
+    toggleEq,
+    closeBatchTag: () => setShowBatchTag(false),
+  });
 
   // 标签更新后刷新数据
   const handleTagsUpdated = async () => {

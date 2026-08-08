@@ -115,14 +115,16 @@ export default function PlayerBar(props: PlayerBarProps) {
           >
             {playModeIcon(playMode)}
           </button>
-          <button className="icon-btn" title="上一首" onClick={onPrev}>
+          <button className="icon-btn" title="上一首（Shift+←）" aria-label="上一首" aria-keyshortcuts="Shift+ArrowLeft" onClick={onPrev}>
             <svg width="16" height="16" viewBox="0 0 16 16">
               <path d="M3 3v10M13 3 L5 8 L13 13 Z" fill="currentColor" />
             </svg>
           </button>
           <button
             className="icon-btn playerbar-play-btn"
-            title={isPlaying ? '暂停' : '播放'}
+            title={`${isPlaying ? '暂停' : '播放'}（Space）`}
+            aria-label={isPlaying ? '暂停' : '播放'}
+            aria-keyshortcuts="Space"
             onClick={onTogglePlay}
           >
             {isPlaying ? (
@@ -136,7 +138,7 @@ export default function PlayerBar(props: PlayerBarProps) {
               </svg>
             )}
           </button>
-          <button className="icon-btn" title="下一首" onClick={onNext}>
+          <button className="icon-btn" title="下一首（Shift+→）" aria-label="下一首" aria-keyshortcuts="Shift+ArrowRight" onClick={onNext}>
             <svg width="16" height="16" viewBox="0 0 16 16">
               <path d="M13 3v10M3 3 L11 8 L3 13 Z" fill="currentColor" />
             </svg>
@@ -164,7 +166,9 @@ export default function PlayerBar(props: PlayerBarProps) {
       <div className="playerbar-right">
         <button
           className={`icon-btn ${lyricsActive ? 'active' : ''}`}
-          title="歌词"
+          title="歌词（L）"
+          aria-label="歌词"
+          aria-keyshortcuts="L"
           onClick={onToggleLyrics}
         >
           <svg width="16" height="16" viewBox="0 0 16 16">
@@ -173,7 +177,9 @@ export default function PlayerBar(props: PlayerBarProps) {
         </button>
         <button
           className={`icon-btn ${eqActive ? 'active' : ''}`}
-          title="均衡器"
+          title="均衡器（E）"
+          aria-label="均衡器"
+          aria-keyshortcuts="E"
           onClick={onToggleEq}
         >
           <svg width="16" height="16" viewBox="0 0 16 16">
@@ -186,8 +192,9 @@ export default function PlayerBar(props: PlayerBarProps) {
         </button>
         <button
           className={`icon-btn ${immersiveActive ? 'active' : ''}`}
-          title={immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}
+          title={`${immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}（I）`}
           aria-label={immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}
+          aria-keyshortcuts="I"
           disabled={!title}
           onClick={onToggleImmersive}
         >

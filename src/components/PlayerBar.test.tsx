@@ -25,6 +25,19 @@ const baseProps = {
 };
 
 describe('PlayerBar immersive control', () => {
+  it('exposes discoverable keyboard shortcut hints without changing accessible names', () => {
+    render(<PlayerBar {...baseProps} />);
+
+    expect(screen.getByRole('button', { name: '播放' })).toHaveAttribute('title', '播放（Space）');
+    expect(screen.getByRole('button', { name: '播放' })).toHaveAttribute('aria-keyshortcuts', 'Space');
+    expect(screen.getByRole('button', { name: '上一首' })).toHaveAttribute('title', '上一首（Shift+←）');
+    expect(screen.getByRole('button', { name: '下一首' })).toHaveAttribute('title', '下一首（Shift+→）');
+    expect(screen.getByRole('button', { name: '歌词' })).toHaveAttribute('title', '歌词（L）');
+    expect(screen.getByRole('button', { name: '歌词' })).toHaveAttribute('aria-keyshortcuts', 'L');
+    expect(screen.getByRole('button', { name: '均衡器' })).toHaveAttribute('title', '均衡器（E）');
+    expect(screen.getByRole('button', { name: '进入沉浸模式' })).toHaveAttribute('title', '进入沉浸模式（I）');
+  });
+
   it('enters immersive mode without changing playback controls', () => {
     const onToggleImmersive = vi.fn();
     render(<PlayerBar {...baseProps} onToggleImmersive={onToggleImmersive} />);
