@@ -1,8 +1,9 @@
 // ===== 主布局组件 =====
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStore } from './store/useStore';
 import { api } from './lib/api';
 import { audioEngine } from './audio/AudioEngine';
+import { AudioReactiveAnalyzer } from './audio/reactiveAnalysis';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
 import LibraryView from './components/LibraryView';
@@ -11,6 +12,9 @@ import PlayerBar from './components/PlayerBar';
 import EqPanel from './components/EqPanel';
 import LyricsPanel from './components/LyricsPanel';
 import BatchTagEditor from './components/BatchTagEditor';
+import ImmersiveVisualizer from './components/ImmersiveVisualizer';
+import { findCurrentLine } from './lyrics/LyricsScroller';
+import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -20,6 +24,7 @@ export default function App() {
   const duration = useStore((s) => s.duration);
   const volume = useStore((s) => s.volume);
   const playMode = useStore((s) => s.playMode);
+  const currentTrackId = currentTrack?.id ?? null;
 
   // ===== UI 状态 =====
   const view = useStore((s) => s.view);
@@ -29,6 +34,9 @@ export default function App() {
   const coverArt = useStore((s) => s.coverArt);
   const selectedTrackIds = useStore((s) => s.selectedTrackIds);
   const currentPlaylistId = useStore((s) => s.currentPlaylistId);
+  const lyrics = useStore((s) => s.lyrics);
+  const immersiveMode = useStore((s) => s.immersiveMode);
+  const reactiveMotionEnabled = useStore((s) => s.reactiveMotionEnabled);
 
   // ===== Actions =====
   const setTracks = useStore((s) => s.setTracks);
@@ -42,6 +50,66 @@ export default function App() {
   const setIsPlaying = useStore((s) => s.setIsPlaying);
   const playNext = useStore((s) => s.playNext);
   const playPrev = useStore((s) => s.playPrev);
+  const setImmersiveMode = useStore((s) => s.setImmersiveMode);
+  const setReactiveMotionEnabled = useStore((s) => s.setReactiveMotionEnabled);
+
+  const currentLyric = useMemo(() => {
+    if (!lyrics?.lines.length) return null;
+    if (lyrics.type === 'synced') {
+      const index = findCurrentLine(lyrics.lines, currentTime);
+      return index >= 0 ? lyrics.lines[index].text : null;
+    }
+    if (duration <= 0) return lyrics.lines[0]?.text ?? null;
+    const index = Math.min(lyrics.lines.length - 1, Math.floor((currentTime / duration) * lyrics.lines.length));
+    return lyrics.lines[index]?.text ?? null;
+  }, [lyrics, currentTime, duration]);
+
+  useEffect(() => {
+    if (!immersiveMode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setImmersiveMode(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [immersiveMode, setImmersiveMode]);
+
+  // 日常模式只更新根节点 CSS 变量，不触发 React 高频渲染。
+  useEffect(() => {
+    const root = document.documentElement;
+    const palette = fallbackPalette(String(currentTrackId ?? 'peter-player'));
+    root.style.setProperty('--ambient-color', palette.colors[0]);
+    if (!coverArt) return;
+    let current = true;
+    extractCoverPalette(coverArt, String(currentTrackId))
+      .then((result) => {
+        if (current) root.style.setProperty('--ambient-color', result.colors[0]);
+      })
+      .catch(() => undefined);
+    return () => { current = false; };
+  }, [coverArt, currentTrackId]);
+
+  useEffect(() => {
+    if (!isPlaying || immersiveMode || !reactiveMotionEnabled) return;
+    const root = document.documentElement;
+    const analyzer = new AudioReactiveAnalyzer(audioEngine.frequencyBinCount);
+    const data = new Uint8Array(new ArrayBuffer(audioEngine.frequencyBinCount));
+    let frameId = 0;
+    let lastSample = 0;
+    const frame = (now: number) => {
+      frameId = requestAnimationFrame(frame);
+      if (document.hidden || now - lastSample < 50 || !audioEngine.getFrequencyData(data)) return;
+      lastSample = now;
+      const signal = analyzer.update(data, now);
+      root.style.setProperty('--ambient-bass', signal.bass.toFixed(3));
+      root.style.setProperty('--ambient-energy', signal.energy.toFixed(3));
+    };
+    frameId = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frameId);
+      root.style.setProperty('--ambient-bass', '0');
+      root.style.setProperty('--ambient-energy', '0');
+    };
+  }, [immersiveMode, isPlaying, reactiveMotionEnabled, currentTrackId]);
 
   // ===== 初始化 AudioEngine 回调（仅一次） =====
   useEffect(() => {
@@ -75,7 +143,6 @@ export default function App() {
   }, []);
 
   // ===== 当前曲目变化 → 加载 + 播放 + 加载歌词 =====
-  const currentTrackId = currentTrack?.id ?? null;
   useEffect(() => {
     if (currentTrackId === null) return;
 
@@ -172,8 +239,20 @@ export default function App() {
       <div className="app-body">
         <Sidebar />
 
-        <main className="app-main">
-          {view === 'library' ? <LibraryView /> : <PlaylistView />}
+        <main className={`app-main ${immersiveMode ? 'immersive-active' : ''}`}>
+          {immersiveMode && currentTrack ? (
+            <ImmersiveVisualizer
+              trackKey={String(currentTrack.id)}
+              title={currentTrack.title ?? currentTrack.file_name}
+              artist={currentTrack.artist}
+              lyric={currentLyric}
+              coverArt={coverArt}
+              isPlaying={isPlaying}
+              motionEnabled={reactiveMotionEnabled}
+              onExit={() => setImmersiveMode(false)}
+              onMotionChange={setReactiveMotionEnabled}
+            />
+          ) : view === 'library' ? <LibraryView /> : <PlaylistView />}
         </main>
 
         {/* 浮层面板（EQ 或歌词） */}
@@ -196,6 +275,7 @@ export default function App() {
         coverArt={coverArt}
         lyricsActive={showLyrics}
         eqActive={showEq}
+        immersiveActive={immersiveMode}
         playMode={playMode}
         onTogglePlay={handleTogglePlay}
         onNext={playNext}
@@ -204,6 +284,7 @@ export default function App() {
         onVolumeChange={setVolume}
         onToggleLyrics={toggleLyrics}
         onToggleEq={toggleEq}
+        onToggleImmersive={() => setImmersiveMode(!immersiveMode)}
         onCyclePlayMode={cyclePlayMode}
       />
 

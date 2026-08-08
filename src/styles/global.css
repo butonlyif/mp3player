@@ -1001,6 +1001,24 @@ input[type='range']::-webkit-slider-thumb:hover {
   border-radius: 0;
   flex-shrink: 0;
   gap: 16px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.playerbar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  bottom: -46px;
+  width: 34%;
+  height: 70px;
+  background: var(--ambient-color, var(--accent));
+  opacity: calc(var(--ambient-energy, 0) * 0.12);
+  filter: blur(30px);
+  pointer-events: none;
+  transition: opacity 500ms ease;
 }
 
 .playerbar-info {
@@ -1071,6 +1089,11 @@ input[type='range']::-webkit-slider-thumb:hover {
   background: rgba(217, 154, 108, 0.3);
 }
 
+.playerbar.is-playing .playerbar-play-btn {
+  transform: scale(calc(1 + var(--ambient-bass, 0) * 0.035));
+  box-shadow: 0 0 calc(4px + var(--ambient-energy, 0) * 14px) color-mix(in srgb, var(--ambient-color, var(--accent)) 34%, transparent);
+}
+
 .playerbar-progress {
   display: flex;
   align-items: center;
@@ -1113,6 +1136,191 @@ input[type='range']::-webkit-slider-thumb:hover {
   width: 80px;
   height: 4px;
   border-radius: 2px;
+}
+
+/* ============================================================
+   Liquid Memory 音频响应视觉
+   ============================================================ */
+.app-main.immersive-active {
+  position: relative;
+  background: #09090d;
+}
+
+.liquid-memory {
+  --liquid-color-1: rgb(91 67 175);
+  --liquid-color-2: rgb(180 78 139);
+  --liquid-color-3: rgb(38 128 132);
+  --liquid-energy: 0;
+  --liquid-bass: 0;
+  --liquid-mid: 0;
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #08090d;
+}
+
+.liquid-cover-texture {
+  position: absolute;
+  inset: -18%;
+  z-index: -5;
+  background-position: center;
+  background-size: cover;
+  opacity: calc(0.1 + var(--liquid-energy) * 0.08);
+  filter: blur(56px) saturate(1.45) contrast(1.05);
+  transform: scale(1.18);
+  transition: background-image 1.6s ease, opacity 800ms ease;
+}
+
+.liquid-memory::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle at 50% 45%, transparent 0, rgba(5, 6, 10, 0.18) 42%, rgba(5, 6, 10, 0.62) 100%);
+  pointer-events: none;
+}
+
+.liquid-fog {
+  position: absolute;
+  width: 65%;
+  aspect-ratio: 1;
+  z-index: -4;
+  border-radius: 44% 56% 62% 38%;
+  filter: blur(48px);
+  opacity: calc(0.34 + var(--liquid-energy) * 0.26);
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+  transition: background 3s ease, opacity 800ms ease;
+}
+
+.liquid-fog-one {
+  left: -12%;
+  top: -24%;
+  background: var(--liquid-color-1);
+  animation: liquid-drift-one 14s ease-in-out infinite alternate;
+}
+
+.liquid-fog-two {
+  right: -18%;
+  top: 8%;
+  background: var(--liquid-color-2);
+  animation: liquid-drift-two 17s ease-in-out infinite alternate;
+}
+
+.liquid-fog-three {
+  left: 22%;
+  bottom: -45%;
+  background: var(--liquid-color-3);
+  animation: liquid-drift-three 19s ease-in-out infinite alternate;
+}
+
+.liquid-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.liquid-toolbar {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.liquid-motion-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(12, 13, 19, 0.42);
+  backdrop-filter: blur(14px);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.liquid-exit {
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(12, 13, 19, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.liquid-metadata {
+  position: relative;
+  z-index: 2;
+  width: min(720px, 80%);
+  text-align: center;
+  text-shadow: 0 3px 30px rgba(0, 0, 0, 0.72);
+  transform: translateY(-2%);
+}
+
+.liquid-kicker {
+  display: block;
+  margin-bottom: 18px;
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.liquid-metadata h1 {
+  font-size: clamp(32px, 6vw, 68px);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.liquid-artist {
+  margin-top: 12px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.liquid-lyric {
+  margin: 54px auto 0;
+  max-width: 620px;
+  font-size: clamp(15px, 2.2vw, 22px);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.84);
+  transition: opacity 350ms ease, transform 350ms ease;
+}
+
+.liquid-memory.is-playing .liquid-metadata {
+  animation: liquid-breathe 2.8s ease-in-out infinite alternate;
+}
+
+.liquid-memory.is-paused .liquid-fog,
+.liquid-memory.motion-off .liquid-fog,
+.liquid-memory.motion-off .liquid-metadata {
+  animation-play-state: paused;
+}
+
+@keyframes liquid-drift-one { to { transform: translate(26%, 18%) rotate(18deg) scale(1.12); } }
+@keyframes liquid-drift-two { to { transform: translate(-20%, 24%) rotate(-22deg) scale(1.16); } }
+@keyframes liquid-drift-three { to { transform: translate(4%, -24%) rotate(14deg) scale(1.1); } }
+@keyframes liquid-breathe { to { transform: translateY(-2%) scale(calc(1 + var(--liquid-bass) * 0.012)); } }
+
+@media (max-width: 760px) {
+  .liquid-metadata { width: 86%; }
+  .liquid-lyric { margin-top: 34px; }
+  .liquid-fog { width: 86%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-fog,
+  .liquid-metadata,
+  .liquid-cover-texture { animation: none !important; transition: none !important; }
+  .liquid-particles { display: none; }
 }
 
 /* ============================================================

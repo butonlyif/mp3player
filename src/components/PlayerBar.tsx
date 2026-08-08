@@ -12,6 +12,7 @@ interface PlayerBarProps {
   coverArt: string | null;
   lyricsActive: boolean;
   eqActive: boolean;
+  immersiveActive: boolean;
   playMode: PlayMode;
   onTogglePlay: () => void;
   onNext: () => void;
@@ -20,6 +21,7 @@ interface PlayerBarProps {
   onVolumeChange: (v: number) => void;
   onToggleLyrics: () => void;
   onToggleEq: () => void;
+  onToggleImmersive: () => void;
   onCyclePlayMode: () => void;
 }
 
@@ -67,6 +69,7 @@ export default function PlayerBar(props: PlayerBarProps) {
     coverArt,
     lyricsActive,
     eqActive,
+    immersiveActive,
     playMode,
     onTogglePlay,
     onNext,
@@ -75,13 +78,14 @@ export default function PlayerBar(props: PlayerBarProps) {
     onVolumeChange,
     onToggleLyrics,
     onToggleEq,
+    onToggleImmersive,
     onCyclePlayMode,
   } = props;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <footer className="playerbar glass-panel">
+    <footer className={`playerbar glass-panel ${isPlaying ? 'is-playing' : ''}`}>
       {/* 左侧：当前曲目信息 + 封面 */}
       <div className="playerbar-info">
         <div className="playerbar-cover">
@@ -178,6 +182,18 @@ export default function PlayerBar(props: PlayerBarProps) {
             <circle cx="6" cy="9" r="1.5" fill="currentColor" />
             <circle cx="10" cy="8" r="1.5" fill="currentColor" />
             <circle cx="14" cy="11" r="1.5" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          className={`icon-btn ${immersiveActive ? 'active' : ''}`}
+          title={immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}
+          aria-label={immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}
+          disabled={!title}
+          onClick={onToggleImmersive}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2.5 6.5c1.2-3.1 3.4-4 5.5-2 2.1-2 4.3-1.1 5.5 2-1.2 3.1-3.4 4-5.5 2-2.1 2-4.3 1.1-5.5-2Z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="8" cy="6.5" r="1.6" fill="currentColor" />
           </svg>
         </button>
         <div className="playerbar-volume">

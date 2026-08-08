@@ -21,6 +21,9 @@ src-tauri/gen/
 .env
 .env.*
 
+# Local design previews
+.superpowers/
+
 # Icons source (keep generated ones)
 src-tauri/icons/source-icon.png
 src-tauri/icons/icon.iconset/

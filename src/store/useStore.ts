@@ -45,6 +45,8 @@ interface AppState {
   showEq: boolean;
   showLyrics: boolean;
   showBatchTag: boolean;
+  immersiveMode: boolean;
+  reactiveMotionEnabled: boolean;
 
   // ===== Actions: 库 =====
   setTracks: (tracks: Track[]) => void;
@@ -85,6 +87,8 @@ interface AppState {
   toggleEq: () => void;
   toggleLyrics: () => void;
   setShowBatchTag: (show: boolean) => void;
+  setImmersiveMode: (enabled: boolean) => void;
+  setReactiveMotionEnabled: (enabled: boolean) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -117,6 +121,10 @@ export const useStore = create<AppState>((set, get) => ({
   showEq: false,
   showLyrics: false,
   showBatchTag: false,
+  immersiveMode: false,
+  reactiveMotionEnabled: typeof window === 'undefined'
+    ? true
+    : !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 
   // ===== Actions: 库 =====
   setTracks: (tracks) => set({ tracks }),
@@ -261,4 +269,6 @@ export const useStore = create<AppState>((set, get) => ({
   toggleEq: () => set((state) => ({ showEq: !state.showEq })),
   toggleLyrics: () => set((state) => ({ showLyrics: !state.showLyrics })),
   setShowBatchTag: (show) => set({ showBatchTag: show }),
+  setImmersiveMode: (enabled) => set({ immersiveMode: enabled }),
+  setReactiveMotionEnabled: (enabled) => set({ reactiveMotionEnabled: enabled }),
 }));
