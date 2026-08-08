@@ -47,14 +47,19 @@ afterEach(() => {
 
 describe('LibraryView contextual playback queues', () => {
   it('plays only the selected album in disc and track order', () => {
-    const selected = track(2, '第二首', { album: '夜航', disc_no: 1, track_no: 2 });
+    const selected = track(2, '第二首', { album: '夜航', album_artist: '远岸', disc_no: 1, track_no: 2 });
     useStore.setState({
       libraryMode: 'album',
-      tracks: [selected, track(1, '第一首', { album: '夜航', disc_no: 1, track_no: 1 }), track(3, '别的专辑', { album: '白昼' })],
+      tracks: [
+        selected,
+        track(1, '第一首', { album: '夜航', album_artist: '远岸', disc_no: 1, track_no: 1 }),
+        track(4, '同名别辑', { album: '夜航', album_artist: '另一位' }),
+        track(3, '别的专辑', { album: '白昼' }),
+      ],
     });
     render(<LibraryView />);
 
-    fireEvent.click(screen.getByText('夜航'));
+    fireEvent.click(screen.getByText(/远岸 · 2 首/).closest('.album-header')!);
     fireEvent.doubleClick(screen.getByText('第二首'));
 
     expect(useStore.getState().playQueue.map((item) => item.id)).toEqual([1, 2]);

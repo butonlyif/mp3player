@@ -33,7 +33,7 @@ function getSortValue(track: Track, field: string): string | number {
 }
 
 // ---------- 专辑分组类型 ----------
-interface AlbumGroup { album: string; artist: string; tracks: Track[]; }
+interface AlbumGroup { key: string; album: string; artist: string; tracks: Track[]; }
 
 // ---------- 文件夹树类型 ----------
 interface TreeNode { name: string; fullPath: string; children: Map<string, TreeNode>; tracks: Track[]; }
@@ -354,8 +354,10 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
   const albums = useMemo<AlbumGroup[]>(() => {
     const map = new Map<string, AlbumGroup>();
     for (const t of tracks) {
-      const key = t.album || '未知专辑';
-      if (!map.has(key)) map.set(key, { album: key, artist: t.album_artist || t.artist || '未知艺术家', tracks: [] });
+      const album = t.album || '未知专辑';
+      const artist = t.album_artist || t.artist || '未知艺术家';
+      const key = `${artist}\u0000${album}`;
+      if (!map.has(key)) map.set(key, { key, album, artist, tracks: [] });
       map.get(key)!.tracks.push(t);
     }
     return [...map.values()].sort((a, b) => a.album.localeCompare(b.album));
@@ -371,11 +373,11 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
     <div className="album-view">
       <div className="album-list">
         {albums.map(album => {
-          const isExpanded = expanded.has(album.album);
+          const isExpanded = expanded.has(album.key);
           const albumQueue = sortAlbumQueue(album.tracks);
           return (
-            <div key={album.album} className="album-group">
-              <div className="album-header list-row" onClick={() => toggleExpand(album.album)}>
+            <div key={album.key} className="album-group">
+              <div className="album-header list-row" onClick={() => toggleExpand(album.key)}>
                 <span className="album-expand-icon">{isExpanded ? '▾' : '▸'}</span>
                 <div className="album-cover">
                   <svg width="32" height="32" viewBox="0 0 32 32">
