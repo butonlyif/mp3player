@@ -242,8 +242,7 @@ export class AudioEngine {
     } catch {
       next.pause();
       nextSource?.disconnect();
-      this.crossfading = false;
-      this.transitionAudio = null;
+      this.releaseCrossfade(generation, next);
       return false;
     }
 
@@ -309,13 +308,21 @@ export class AudioEngine {
     this.cancelCrossfade();
   }
 
-  private cancelCrossfade(): void {
+  cancelCrossfade(): void {
     if (!this.crossfading && !this.transitionAudio) return;
     this.crossfadeGeneration += 1;
     this.crossfading = false;
     this.transitionAudio?.pause();
     this.transitionAudio = null;
     this.audio.volume = 1;
+  }
+
+  /** Clear transition state only when the caller still owns it. */
+  private releaseCrossfade(generation: number, audio: HTMLAudioElement): boolean {
+    if (generation !== this.crossfadeGeneration || this.transitionAudio !== audio) return false;
+    this.crossfading = false;
+    this.transitionAudio = null;
+    return true;
   }
 
   /** 跳转到指定时间（秒） */

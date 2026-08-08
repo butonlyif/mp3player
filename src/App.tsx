@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useStore } from './store/useStore';
 import { api } from './lib/api';
 import { audioEngine } from './audio/AudioEngine';
+import { loadTrackRequest } from './audio/loadTrackRequest';
 import { AudioReactiveAnalyzer } from './audio/reactiveAnalysis';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
@@ -175,23 +176,22 @@ export default function App() {
     if (currentTrackId === null) return;
     useStore.getState().setCoverArt(null);
 
+    // Claim this transition for this specific selection before any async work.
+    const fadeSeconds = pendingCrossfade.current;
+    pendingCrossfade.current = null;
+    const requestController = new AbortController();
+
     // 异步获取可播放 URL（convertFileSrc）
-    api.streamUrl(currentTrackId)
-      .then(async (url) => {
-        // 确保仍是当前曲目
-        if (useStore.getState().currentTrack?.id === currentTrackId) {
-          const fadeSeconds = pendingCrossfade.current;
-          pendingCrossfade.current = null;
-          if (fadeSeconds && useStore.getState().crossfadeEnabled) {
-            const transitioned = await audioEngine.crossfadeTo(url, fadeSeconds);
-            if (transitioned) return;
-          }
-          audioEngine.load(url);
-          if (useStore.getState().isPlaying) {
-            audioEngine.play();
-          }
-        }
-      })
+    loadTrackRequest({
+      trackId: currentTrackId,
+      urlPromise: api.streamUrl(currentTrackId),
+      fadeSeconds,
+      crossfadeEnabled: () => useStore.getState().crossfadeEnabled,
+      engine: audioEngine,
+      signal: requestController.signal,
+      isCurrent: (trackId) => useStore.getState().currentTrack?.id === trackId,
+      shouldPlay: () => useStore.getState().isPlaying,
+    })
       .catch((err) => {
         console.error('加载音频失败:', err);
       });
@@ -221,6 +221,8 @@ export default function App() {
           useStore.getState().setCoverArt(null);
         }
       });
+
+    return () => requestController.abort();
   }, [currentTrackId]);
 
   // ===== isPlaying 变化 → play / pause =====
