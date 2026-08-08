@@ -238,16 +238,42 @@ pub fn library_get_track_tags(
         result.track_no = tag.track().map(|t| t as i64);
         result.disc_no = tag.disk().map(|d| d as i64);
 
-        // 歌词：标准键 → 自定义键 → Comment
-        if let Some(text) = tag.get_string(&ItemKey::Lyrics) {
-            result.lyrics = Some(text.to_string());
-        } else {
+        // 歌词：优先 TXXX:LYRICS（有时间戳）→ USLT/ItemKey::Lyrics → 其他 lyrics 帧
+        // 1) TXXX:LYRICS 自定义帧
+        for item in tag.items() {
+            if let lofty::tag::ItemKey::Unknown(desc) = item.key() {
+                let d = desc.to_lowercase();
+                if d == "lyrics" || d == "lyric" {
+                    if let Some(text) = item.value().text() {
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            result.lyrics = Some(text.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // 2) USLT / ItemKey::Lyrics
+        if result.lyrics.is_none() {
+            if let Some(text) = tag.get_string(&ItemKey::Lyrics) {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    result.lyrics = Some(text.to_string());
+                }
+            }
+        }
+        // 3) 其他非标准 lyrics 帧
+        if result.lyrics.is_none() {
             for item in tag.items() {
                 let key_str = format!("{:?}", item.key()).to_lowercase();
                 if key_str.contains("lyrics") || key_str.contains("lyric") {
                     if let Some(text) = item.value().text() {
-                        result.lyrics = Some(text.to_string());
-                        break;
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            result.lyrics = Some(text.to_string());
+                            break;
+                        }
                     }
                 }
             }

@@ -104,6 +104,7 @@ pub fn parse_file(path: &Path) -> Option<TrackInfo> {
 }
 
 /// 按需提取完整歌词（嵌入式优先，其次外部 .lrc）
+/// 优先级：TXXX:LYRICS（有时间戳）> USLT/ItemKey::Lyrics（无时间戳）> 外部 .lrc
 pub fn get_lyrics(path: &str) -> Option<ParsedLyrics> {
     let p = Path::new(path);
     if let Ok(tagged_file) = read_from_path(p) {
@@ -112,7 +113,26 @@ pub fn get_lyrics(path: &str) -> Option<ParsedLyrics> {
             .or_else(|| tagged_file.first_tag());
 
         if let Some(tag) = tag {
-            // 1) 尝试标准 Lyrics 键
+            // 1) 优先：TXXX:LYRICS 自定义帧（通常带 LRC 时间戳）
+            //    lofty 中映射为 ItemKey::Unknown("LYRICS") 等变体
+            for item in tag.items() {
+                match item.key() {
+                    lofty::tag::ItemKey::Unknown(desc) => {
+                        let d = desc.to_lowercase();
+                        if d == "lyrics" || d == "lyric" {
+                            if let Some(text) = item.value().text() {
+                                let trimmed = text.trim();
+                                if !trimmed.is_empty() {
+                                    return Some(parse_lyrics_text(trimmed));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // 2) 其次：USLT / ItemKey::Lyrics（通常无时间戳）
             if let Some(text) = tag.get_string(&ItemKey::Lyrics) {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
@@ -120,7 +140,7 @@ pub fn get_lyrics(path: &str) -> Option<ParsedLyrics> {
                 }
             }
 
-            // 2) 遍历所有条目，找包含 "lyrics" 的 key（非标准帧如 lyrics-eng）
+            // 3) 其他非标准 lyrics 帧（如 lyrics-eng 等）
             for item in tag.items() {
                 let key_str = format!("{:?}", item.key()).to_lowercase();
                 if key_str.contains("lyrics") || key_str.contains("lyric") {
@@ -132,17 +152,9 @@ pub fn get_lyrics(path: &str) -> Option<ParsedLyrics> {
                     }
                 }
             }
-
-            // 3) Comment fallback（启发式）
-            if let Some(text) = tag.get_string(&ItemKey::Comment) {
-                let trimmed = text.trim();
-                if !trimmed.is_empty() && looks_like_lyrics(trimmed) {
-                    return Some(parse_lyrics_text(trimmed));
-                }
-            }
         }
     }
-    // 外部 .lrc
+    // 4) 外部 .lrc
     read_external_lrc(p).map(|t| parse_lyrics_text(t.trim()))
 }
 
@@ -153,19 +165,33 @@ fn looks_like_lyrics(text: &str) -> bool {
 }
 
 /// 轻量歌词探测（扫描时使用，避免构造完整行集合）
+/// 优先级：TXXX:LYRICS > USLT > 其他 lyrics 帧 > 外部 .lrc
 fn detect_lyrics(tag: Option<&lofty::tag::Tag>, path: &Path) -> (bool, Option<String>) {
-    // 1) 标准 Lyrics 键
-    let embedded = tag
-        .and_then(|t| t.get_string(&ItemKey::Lyrics))
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty());
-
-    if let Some(text) = embedded {
-        return (true, Some(lyrics_kind(text).to_string()));
-    }
-
-    // 2) 遍历所有条目，找包含 "lyrics" 的 key（非标准帧）
     if let Some(tag) = tag {
+        // 1) 优先：TXXX:LYRICS 自定义帧（带时间戳）
+        for item in tag.items() {
+            if let lofty::tag::ItemKey::Unknown(desc) = item.key() {
+                let d = desc.to_lowercase();
+                if d == "lyrics" || d == "lyric" {
+                    if let Some(text) = item.value().text() {
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            return (true, Some(lyrics_kind(trimmed).to_string()));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2) USLT / ItemKey::Lyrics
+        if let Some(text) = tag.get_string(&ItemKey::Lyrics) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return (true, Some(lyrics_kind(trimmed).to_string()));
+            }
+        }
+
+        // 3) 其他非标准 lyrics 帧
         for item in tag.items() {
             let key_str = format!("{:?}", item.key()).to_lowercase();
             if key_str.contains("lyrics") || key_str.contains("lyric") {
@@ -179,7 +205,7 @@ fn detect_lyrics(tag: Option<&lofty::tag::Tag>, path: &Path) -> (bool, Option<St
         }
     }
 
-    // 3) 外部 .lrc
+    // 4) 外部 .lrc
     if let Some(text) = read_external_lrc(path) {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
