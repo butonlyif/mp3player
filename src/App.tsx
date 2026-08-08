@@ -100,8 +100,18 @@ export default function App() {
     let active = true;
     const frame = (now: number) => {
       if (!active || document.hidden) return;
-      if (now - lastSample < 50 || !audioEngine.getFrequencyData(data)) {
+      if (now - lastSample < 50) {
         frameId = requestAnimationFrame(frame);
+        return;
+      }
+      if (!audioEngine.getFrequencyData(data)) {
+        if (audioEngine.analysisState !== 'unavailable') {
+          frameId = requestAnimationFrame(frame);
+        } else {
+          root.style.setProperty('--ambient-scale', '1');
+          root.style.setProperty('--ambient-haze-opacity', '0');
+          root.style.setProperty('--ambient-glow', '4px');
+        }
         return;
       }
       lastSample = now;
@@ -115,7 +125,10 @@ export default function App() {
     };
     const onVisibility = () => {
       cancelAnimationFrame(frameId);
-      if (!document.hidden && active) frameId = requestAnimationFrame(frame);
+      if (!document.hidden && active) {
+        lastSample = 0;
+        frameId = requestAnimationFrame(frame);
+      }
     };
     document.addEventListener('visibilitychange', onVisibility);
     if (!document.hidden) frameId = requestAnimationFrame(frame);

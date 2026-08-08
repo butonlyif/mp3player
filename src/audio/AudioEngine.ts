@@ -118,6 +118,11 @@ export class AudioEngine {
     return this.analyser?.fftSize ?? 256;
   }
 
+  get analysisState(): 'pending' | 'ready' | 'unavailable' {
+    if (!this.ctx) return 'pending';
+    return this.analyser ? 'ready' : 'unavailable';
+  }
+
   // ===== 回调注册 =====
 
   /** 注册时间更新回调 */

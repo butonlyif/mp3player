@@ -102,8 +102,17 @@ export default function ImmersiveVisualizer({
       const dt = lastSample ? now - lastSample : 33;
       lastSample = now;
       const frequencyData = frequencyRef.current!;
-      if (isPlaying) audioEngine.getFrequencyData(frequencyData);
-      else frequencyData.fill(0);
+      if (isPlaying && !audioEngine.getFrequencyData(frequencyData)) {
+        if (audioEngine.analysisState === 'unavailable') {
+          root.classList.add('analysis-unavailable');
+          fieldRef.current?.clear();
+          return;
+        }
+        frameId = requestAnimationFrame(frame);
+        return;
+      } else if (!isPlaying) {
+        frequencyData.fill(0);
+      }
       const signal = analyzerRef.current!.update(frequencyData, now);
       const mood = moodRef.current!.update(signal, dt);
       root.style.setProperty('--liquid-energy', signal.energy.toFixed(3));
@@ -131,7 +140,10 @@ export default function ImmersiveVisualizer({
     };
     const onVisibility = () => {
       cancelAnimationFrame(frameId);
-      if (!document.hidden && active) frameId = requestAnimationFrame(frame);
+      if (!document.hidden && active) {
+        lastSample = 0;
+        frameId = requestAnimationFrame(frame);
+      }
     };
     document.addEventListener('visibilitychange', onVisibility);
     if (!document.hidden) frameId = requestAnimationFrame(frame);
@@ -139,6 +151,7 @@ export default function ImmersiveVisualizer({
       active = false;
       cancelAnimationFrame(frameId);
       document.removeEventListener('visibilitychange', onVisibility);
+      root.classList.remove('analysis-unavailable');
     };
   }, [isPlaying, motionEnabled, trackKey]);
 

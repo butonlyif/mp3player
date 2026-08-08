@@ -1307,6 +1307,8 @@ input[type='range']::-webkit-slider-thumb:hover {
 }
 
 .liquid-memory.is-paused .liquid-fog,
+.liquid-memory.analysis-unavailable .liquid-fog,
+.liquid-memory.analysis-unavailable .liquid-metadata,
 .liquid-memory.motion-off .liquid-fog,
 .liquid-memory.motion-off .liquid-metadata {
   animation-play-state: paused;
