@@ -14,7 +14,9 @@ describe('ImmersiveVisualizer', () => {
         lyric="夏天仍在继续"
         nextLyric="风吹向很远的地方"
         coverArt={null}
-        isPlaying={false}
+      isPlaying={false}
+      currentTime={0}
+      duration={180}
         motionEnabled={false}
         onExit={onExit}
         onMotionChange={() => undefined}

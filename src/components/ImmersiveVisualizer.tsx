@@ -4,6 +4,7 @@ import { AudioReactiveAnalyzer, MoodEngine } from '../audio/reactiveAnalysis';
 import { ParticleField } from '../visualizer/ParticleField';
 import { extractCoverPalette, fallbackPalette } from '../visualizer/palette';
 import { stripAudioExtension } from '../visualizer/trackPresentation';
+import { sectionIntensity } from '../audio/continuousListening';
 
 interface ImmersiveVisualizerProps {
   trackKey: string;
@@ -12,6 +13,8 @@ interface ImmersiveVisualizerProps {
   nextLyric: string | null;
   coverArt: string | null;
   isPlaying: boolean;
+  currentTime: number;
+  duration: number;
   motionEnabled: boolean;
   onExit: () => void;
   onMotionChange: (enabled: boolean) => void;
@@ -20,7 +23,7 @@ interface ImmersiveVisualizerProps {
 type VisualStyle = CSSProperties & Record<`--liquid-${string}`, string>;
 
 export default function ImmersiveVisualizer({
-  trackKey, title, lyric, nextLyric, coverArt, isPlaying, motionEnabled, onExit, onMotionChange,
+  trackKey, title, lyric, nextLyric, coverArt, isPlaying, currentTime, duration, motionEnabled, onExit, onMotionChange,
 }: ImmersiveVisualizerProps) {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,6 +32,8 @@ export default function ImmersiveVisualizer({
   const moodRef = useRef<MoodEngine | null>(null);
   const frequencyRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const canvasErrorLogged = useRef(false);
+  const progressRef = useRef(0);
+  progressRef.current = duration > 0 ? currentTime / duration : 0;
 
   useEffect(() => {
     let current = true;
@@ -116,21 +121,29 @@ export default function ImmersiveVisualizer({
       }
       const signal = analyzerRef.current!.update(frequencyData, now);
       const mood = moodRef.current!.update(signal, dt);
-      root.style.setProperty('--liquid-energy', signal.energy.toFixed(3));
-      root.style.setProperty('--liquid-bass', signal.bass.toFixed(3));
-      root.style.setProperty('--liquid-mid', signal.mid.toFixed(3));
+      const intensity = sectionIntensity(progressRef.current, signal.energy);
+      const visualSignal = {
+        ...signal,
+        energy: Math.min(1, signal.energy * intensity),
+        bass: Math.min(1, signal.bass * intensity),
+        mid: Math.min(1, signal.mid * intensity),
+        treble: Math.min(1, signal.treble * intensity),
+      };
+      root.style.setProperty('--liquid-energy', visualSignal.energy.toFixed(3));
+      root.style.setProperty('--liquid-bass', visualSignal.bass.toFixed(3));
+      root.style.setProperty('--liquid-mid', visualSignal.mid.toFixed(3));
       root.style.setProperty('--liquid-calm', mood.weights.calm.toFixed(3));
       root.style.setProperty('--liquid-warm', mood.weights.warm.toFixed(3));
       root.style.setProperty('--liquid-melancholic', mood.weights.melancholic.toFixed(3));
       root.style.setProperty('--liquid-energetic', mood.weights.energetic.toFixed(3));
-      root.style.setProperty('--liquid-fog-opacity', (0.42 + signal.energy * 0.35 + mood.weights.energetic * 0.12).toFixed(3));
-      root.style.setProperty('--liquid-cover-opacity', (0.18 + signal.energy * 0.16).toFixed(3));
-      root.style.setProperty('--liquid-scale', (1 + signal.bass * 0.025).toFixed(4));
+      root.style.setProperty('--liquid-fog-opacity', (0.42 + visualSignal.energy * 0.35 + mood.weights.energetic * 0.12).toFixed(3));
+      root.style.setProperty('--liquid-cover-opacity', (0.18 + visualSignal.energy * 0.16).toFixed(3));
+      root.style.setProperty('--liquid-scale', (1 + visualSignal.bass * 0.025).toFixed(4));
       root.style.setProperty('--liquid-warm-glow', (mood.weights.warm * 0.34).toFixed(3));
       root.style.setProperty('--liquid-energetic-glow', (mood.weights.energetic * 0.35).toFixed(3));
       root.style.setProperty('--liquid-blue-glow', ((mood.weights.calm + mood.weights.melancholic) * 0.24).toFixed(3));
       try {
-        fieldRef.current?.render(signal, mood, dt);
+        fieldRef.current?.render(visualSignal, mood, dt);
       } catch (error) {
         fieldRef.current?.destroy();
         fieldRef.current = null;

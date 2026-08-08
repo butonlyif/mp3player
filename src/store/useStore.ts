@@ -9,6 +9,12 @@ export type LibraryMode = 'filename' | 'album' | 'folder';
 export type PlayMode = 'sequence' | 'shuffle' | 'repeat-one';
 export type SortOrder = 'asc' | 'desc';
 
+const savedBoolean = (key: string, fallback: boolean) => {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.localStorage.getItem(key);
+  return value === null ? fallback : value === 'true';
+};
+
 interface AppState {
   // ===== 库数据 =====
   tracks: Track[];
@@ -47,6 +53,8 @@ interface AppState {
   showBatchTag: boolean;
   immersiveMode: boolean;
   reactiveMotionEnabled: boolean;
+  crossfadeEnabled: boolean;
+  loudnessBalanceEnabled: boolean;
 
   // ===== Actions: 库 =====
   setTracks: (tracks: Track[]) => void;
@@ -89,6 +97,8 @@ interface AppState {
   setShowBatchTag: (show: boolean) => void;
   setImmersiveMode: (enabled: boolean) => void;
   setReactiveMotionEnabled: (enabled: boolean) => void;
+  setCrossfadeEnabled: (enabled: boolean) => void;
+  setLoudnessBalanceEnabled: (enabled: boolean) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -127,6 +137,8 @@ export const useStore = create<AppState>((set, get) => ({
     : typeof window.matchMedia === 'function'
       ? !window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : true,
+  crossfadeEnabled: savedBoolean('lumen.crossfade', true),
+  loudnessBalanceEnabled: savedBoolean('lumen.loudness-balance', true),
 
   // ===== Actions: 库 =====
   setTracks: (tracks) => set({ tracks }),
@@ -273,4 +285,12 @@ export const useStore = create<AppState>((set, get) => ({
   setShowBatchTag: (show) => set({ showBatchTag: show }),
   setImmersiveMode: (enabled) => set({ immersiveMode: enabled }),
   setReactiveMotionEnabled: (enabled) => set({ reactiveMotionEnabled: enabled }),
+  setCrossfadeEnabled: (enabled) => {
+    if (typeof window !== 'undefined') window.localStorage.setItem('lumen.crossfade', String(enabled));
+    set({ crossfadeEnabled: enabled });
+  },
+  setLoudnessBalanceEnabled: (enabled) => {
+    if (typeof window !== 'undefined') window.localStorage.setItem('lumen.loudness-balance', String(enabled));
+    set({ loudnessBalanceEnabled: enabled });
+  },
 }));

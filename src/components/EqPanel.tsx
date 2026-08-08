@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { audioEngine, EQ_LABELS } from '../audio/AudioEngine';
 import { api } from '../lib/api';
 import type { EqPreset } from '../lib/api';
+import { useStore } from '../store/useStore';
 
 /** 内置预设定义 */
 const BUILTIN_PRESETS: Record<string, number[]> = {
@@ -17,6 +18,10 @@ const BUILTIN_PRESETS: Record<string, number[]> = {
 };
 
 export default function EqPanel() {
+  const crossfadeEnabled = useStore((s) => s.crossfadeEnabled);
+  const loudnessBalanceEnabled = useStore((s) => s.loudnessBalanceEnabled);
+  const setCrossfadeEnabled = useStore((s) => s.setCrossfadeEnabled);
+  const setLoudnessBalanceEnabled = useStore((s) => s.setLoudnessBalanceEnabled);
   const [gains, setGains] = useState<number[]>(audioEngine.getEqGains());
   const [presets, setPresets] = useState<EqPreset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
@@ -87,6 +92,17 @@ export default function EqPanel() {
       {/* 标题 */}
       <div className="eq-header">
         <span className="eq-title">均衡器</span>
+      </div>
+
+      <div className="listening-settings" aria-label="连续聆听设置">
+        <label className="listening-setting">
+          <span><strong>Crossfade</strong><small>曲目衔接时自动柔和重叠，可随时关闭</small></span>
+          <input type="checkbox" checked={crossfadeEnabled} onChange={(e) => setCrossfadeEnabled(e.target.checked)} />
+        </label>
+        <label className="listening-setting">
+          <span><strong>响度平衡</strong><small>缓慢拉近歌曲响度，不压扁动态</small></span>
+          <input type="checkbox" checked={loudnessBalanceEnabled} onChange={(e) => setLoudnessBalanceEnabled(e.target.checked)} />
+        </label>
       </div>
 
       {/* 预设选择 + 另存为 */}

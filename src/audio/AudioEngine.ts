@@ -16,11 +16,22 @@ export class AudioEngine {
   private source: MediaElementAudioSourceNode | null = null;
   private filters: BiquadFilterNode[] = [];
   private gainNode: GainNode | null = null;
+  private normalizationGain: GainNode | null = null;
+  private compressor: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
   private analyserErrorLogged = false;
 
   private _volume = 0.8;
   private _eqGains: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  private _loudnessBalanceEnabled = true;
+  private loudnessSamples = 0;
+  private loudnessMean = 0;
+  private recentEnergy = 0;
+  private crossfading = false;
+  private transitionAudio: HTMLAudioElement | null = null;
+  private crossfadeGeneration = 0;
+  private loudnessCalibrationElapsed = 0;
+  private lastCalibrationPosition = 0;
 
   // 内部回调
   private _timeUpdateCb: ((time: number) => void) | null = null;
@@ -32,19 +43,32 @@ export class AudioEngine {
     this.audio = new Audio();
     this.audio.crossOrigin = 'anonymous';
 
-    this.audio.addEventListener('timeupdate', () => {
+    this.bindAudioEvents(this.audio);
+  }
+
+  private bindAudioEvents(audio: HTMLAudioElement): void {
+    audio.addEventListener('timeupdate', () => {
+      if (audio !== this.audio || this.crossfading) return;
       this._timeUpdateCb?.(this.audio.currentTime);
+      const delta = this.audio.currentTime - this.lastCalibrationPosition;
+      if (delta > 0 && delta <= 2.5) this.loudnessCalibrationElapsed += delta;
+      this.lastCalibrationPosition = this.audio.currentTime;
+      this.sampleLoudness();
     });
-    this.audio.addEventListener('ended', () => {
+    audio.addEventListener('ended', () => {
+      if (audio !== this.audio || this.crossfading) return;
       this._endedCb?.();
     });
-    this.audio.addEventListener('loadedmetadata', () => {
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio !== this.audio) return;
       this._loadedCb?.(this.audio.duration);
     });
-    this.audio.addEventListener('play', () => {
+    audio.addEventListener('play', () => {
+      if (audio !== this.audio) return;
       this._playStateCb?.(true);
     });
-    this.audio.addEventListener('pause', () => {
+    audio.addEventListener('pause', () => {
+      if (audio !== this.audio || this.crossfading) return;
       this._playStateCb?.(false);
     });
   }
@@ -75,21 +99,31 @@ export class AudioEngine {
     // 主音量节点
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = this._volume;
+    this.normalizationGain = this.ctx.createGain();
+    this.compressor = this.ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = -10;
+    this.compressor.knee.value = 12;
+    this.compressor.ratio.value = this._loudnessBalanceEnabled ? 2 : 1;
+    this.compressor.attack.value = 0.02;
+    this.compressor.release.value = 0.35;
 
     // 连接音频图: source → filter[0] → … → filter[9] → gain → destination
     this.source.connect(this.filters[0]);
     for (let i = 0; i < this.filters.length - 1; i++) {
       this.filters[i].connect(this.filters[i + 1]);
     }
-    this.filters[this.filters.length - 1].connect(this.gainNode);
+    this.filters[this.filters.length - 1].connect(this.normalizationGain);
+    this.normalizationGain.connect(this.compressor);
     try {
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 256;
       this.analyser.smoothingTimeConstant = 0.72;
-      this.gainNode.connect(this.analyser);
-      this.analyser.connect(this.ctx.destination);
+      this.compressor.connect(this.analyser);
+      this.analyser.connect(this.gainNode);
+      this.gainNode.connect(this.ctx.destination);
     } catch (error) {
       this.analyser = null;
+      this.compressor.connect(this.gainNode);
       this.gainNode.connect(this.ctx.destination);
       if (!this.analyserErrorLogged) {
         this.analyserErrorLogged = true;
@@ -102,7 +136,27 @@ export class AudioEngine {
   getFrequencyData(target: Uint8Array<ArrayBuffer>): boolean {
     if (!this.analyser || target.length !== this.analyser.frequencyBinCount) return false;
     this.analyser.getByteFrequencyData(target);
+    const instantEnergy = target.reduce((sum, value) => sum + value, 0) / (target.length * 255);
+    this.recentEnergy += (instantEnergy - this.recentEnergy) * 0.08;
+    this.updateLoudnessEstimate(instantEnergy);
     return true;
+  }
+
+  private sampleLoudness(): void {
+    if (!this.analyser || !this.ctx) return;
+    const data = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+    this.analyser.getByteFrequencyData(data);
+    const mean = data.reduce((sum, value) => sum + value, 0) / (data.length * 255);
+    this.recentEnergy += (mean - this.recentEnergy) * 0.08;
+    this.updateLoudnessEstimate(mean);
+  }
+
+  private updateLoudnessEstimate(mean: number): void {
+    if (!this._loudnessBalanceEnabled || !this.normalizationGain || !this.ctx || this.loudnessCalibrationElapsed >= 15) return;
+    this.loudnessSamples += 1;
+    this.loudnessMean += (mean - this.loudnessMean) / this.loudnessSamples;
+    const desired = Math.min(1.3, Math.max(0.75, 0.24 / Math.max(0.08, this.loudnessMean)));
+    this.normalizationGain.gain.setTargetAtTime(desired, this.ctx.currentTime, 3.5);
   }
 
   /** 可视化所需的频谱缓冲区长度。首次播放前使用 FFT 默认值。 */
@@ -149,9 +203,93 @@ export class AudioEngine {
 
   /** 加载音频 URL */
   load(url: string): void {
+    this.cancelCrossfade();
     this.ensureContext();
     this.audio.src = url;
     this.audio.load();
+    this.loudnessSamples = 0;
+    this.loudnessMean = 0;
+    this.loudnessCalibrationElapsed = 0;
+    this.lastCalibrationPosition = 0;
+    if (this.ctx) this.normalizationGain?.gain.setValueAtTime(1, this.ctx.currentTime);
+  }
+
+  async crossfadeTo(url: string, seconds: number): Promise<boolean> {
+    this.ensureContext();
+    if (!this.ctx || this.audio.paused || this.crossfading) return false;
+    this.crossfading = true;
+    const generation = ++this.crossfadeGeneration;
+    const previous = this.audio;
+    const previousSource = this.source;
+    const next = new Audio();
+    next.crossOrigin = 'anonymous';
+    next.volume = 0;
+    this.transitionAudio = next;
+    this.bindAudioEvents(next);
+    let nextSource: MediaElementAudioSourceNode | null = null;
+    try {
+      nextSource = this.ctx.createMediaElementSource(next);
+      nextSource.connect(this.filters[0]);
+      next.src = url;
+      next.load();
+      await new Promise<void>((resolve, reject) => {
+        const timeout = window.setTimeout(() => reject(new Error('crossfade preload timeout')), 4000);
+        next.addEventListener('canplay', () => { window.clearTimeout(timeout); resolve(); }, { once: true });
+        next.addEventListener('error', () => { window.clearTimeout(timeout); reject(new Error('crossfade preload failed')); }, { once: true });
+      });
+      if (generation !== this.crossfadeGeneration) throw new Error('crossfade cancelled');
+      await next.play();
+    } catch {
+      next.pause();
+      nextSource?.disconnect();
+      this.crossfading = false;
+      this.transitionAudio = null;
+      return false;
+    }
+
+    const durationMs = Math.max(0.2, seconds) * 1000;
+    const startedAt = performance.now();
+    await new Promise<void>((resolve) => {
+      const ramp = (now: number) => {
+        if (generation !== this.crossfadeGeneration) {
+          resolve();
+          return;
+        }
+        const progress = Math.min(1, (now - startedAt) / durationMs);
+        previous.volume = Math.cos(progress * Math.PI * 0.5);
+        next.volume = Math.sin(progress * Math.PI * 0.5);
+        if (progress < 1) requestAnimationFrame(ramp);
+        else resolve();
+      };
+      requestAnimationFrame(ramp);
+    });
+
+    if (generation !== this.crossfadeGeneration) {
+      next.pause();
+      nextSource?.disconnect();
+      return false;
+    }
+
+    previous.pause();
+    previous.removeAttribute('src');
+    previousSource?.disconnect();
+    this.audio = next;
+    this.source = nextSource;
+    next.volume = 1;
+    this.crossfading = false;
+    this.transitionAudio = null;
+    this.loudnessSamples = 0;
+    this.loudnessMean = 0;
+    this.loudnessCalibrationElapsed = 0;
+    this.lastCalibrationPosition = 0;
+    if (this.ctx) this.normalizationGain?.gain.setValueAtTime(1, this.ctx.currentTime);
+    this._loadedCb?.(next.duration);
+    this._playStateCb?.(true);
+    return true;
+  }
+
+  get tailEnergy(): number {
+    return this.recentEnergy;
   }
 
   /** 播放（恢复或从头开始） */
@@ -168,6 +306,16 @@ export class AudioEngine {
   /** 暂停 */
   pause(): void {
     this.audio.pause();
+    this.cancelCrossfade();
+  }
+
+  private cancelCrossfade(): void {
+    if (!this.crossfading && !this.transitionAudio) return;
+    this.crossfadeGeneration += 1;
+    this.crossfading = false;
+    this.transitionAudio?.pause();
+    this.transitionAudio = null;
+    this.audio.volume = 1;
   }
 
   /** 跳转到指定时间（秒） */
@@ -185,6 +333,18 @@ export class AudioEngine {
     if (this.gainNode) {
       this.gainNode.gain.value = this._volume;
     }
+  }
+
+  setLoudnessBalance(enabled: boolean): void {
+    this._loudnessBalanceEnabled = enabled;
+    if (this.ctx) {
+      this.normalizationGain?.gain.setTargetAtTime(1, this.ctx.currentTime, 0.8);
+      this.compressor?.ratio.setValueAtTime(enabled ? 2 : 1, this.ctx.currentTime);
+    }
+    this.loudnessSamples = 0;
+    this.loudnessMean = 0;
+    this.loudnessCalibrationElapsed = 0;
+    this.lastCalibrationPosition = this.audio.currentTime;
   }
 
   // ===== EQ 控制 =====

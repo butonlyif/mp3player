@@ -1,5 +1,5 @@
 // ===== 主布局组件 =====
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useStore } from './store/useStore';
 import { api } from './lib/api';
 import { audioEngine } from './audio/AudioEngine';
@@ -17,6 +17,7 @@ import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
 import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPresentation';
 import { usePlaybackShortcuts } from './keyboard/usePlaybackShortcuts';
 import { usePlaybackMemory } from './listening/usePlaybackMemory';
+import { adaptiveCrossfadeSeconds } from './audio/continuousListening';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -39,6 +40,12 @@ export default function App() {
   const lyrics = useStore((s) => s.lyrics);
   const immersiveMode = useStore((s) => s.immersiveMode);
   const reactiveMotionEnabled = useStore((s) => s.reactiveMotionEnabled);
+  const loudnessBalanceEnabled = useStore((s) => s.loudnessBalanceEnabled);
+  const crossfadeEnabled = useStore((s) => s.crossfadeEnabled);
+  const playQueue = useStore((s) => s.playQueue);
+  const playQueueIndex = useStore((s) => s.playQueueIndex);
+  const pendingCrossfade = useRef<number | null>(null);
+  const automaticTransitionTrack = useRef<number | null>(null);
 
   // ===== Actions =====
   const setTracks = useStore((s) => s.setTracks);
@@ -170,9 +177,15 @@ export default function App() {
 
     // 异步获取可播放 URL（convertFileSrc）
     api.streamUrl(currentTrackId)
-      .then((url) => {
+      .then(async (url) => {
         // 确保仍是当前曲目
         if (useStore.getState().currentTrack?.id === currentTrackId) {
+          const fadeSeconds = pendingCrossfade.current;
+          pendingCrossfade.current = null;
+          if (fadeSeconds && useStore.getState().crossfadeEnabled) {
+            const transitioned = await audioEngine.crossfadeTo(url, fadeSeconds);
+            if (transitioned) return;
+          }
           audioEngine.load(url);
           if (useStore.getState().isPlaying) {
             audioEngine.play();
@@ -224,6 +237,10 @@ export default function App() {
     audioEngine.setVolume(volume);
   }, [volume]);
 
+  useEffect(() => {
+    audioEngine.setLoudnessBalance(loudnessBalanceEnabled);
+  }, [loudnessBalanceEnabled]);
+
   // ===== 初始加载库和播放清单 =====
   useEffect(() => {
     api.library
@@ -243,6 +260,16 @@ export default function App() {
     if (didSeek) useStore.getState().setCurrentTime(time);
     return didSeek;
   };
+  const handleNext = () => {
+    const canAdvance = playMode === 'shuffle' || playQueueIndex + 1 < playQueue.length;
+    if (crossfadeEnabled && isPlaying && canAdvance) pendingCrossfade.current = 0.5;
+    else pendingCrossfade.current = null;
+    playNext();
+  };
+  const handlePrev = () => {
+    if (crossfadeEnabled && isPlaying) pendingCrossfade.current = 0.5;
+    playPrev();
+  };
 
   usePlaybackShortcuts({
     hasTrack: currentTrack !== null,
@@ -256,8 +283,8 @@ export default function App() {
     showEq,
     setPlaying: setIsPlaying,
     seek: handleSeek,
-    previous: playPrev,
-    next: playNext,
+    previous: handlePrev,
+    next: handleNext,
     setVolume,
     setImmersiveMode,
     toggleLyrics,
@@ -272,6 +299,20 @@ export default function App() {
     duration,
     seek: handleSeek,
   });
+
+  useEffect(() => {
+    if (!crossfadeEnabled || !isPlaying || currentTrackId === null || duration <= 0) return;
+    if (currentTime < 1) automaticTransitionTrack.current = null;
+    if (playMode === 'repeat-one' || playQueue.length === 0) return;
+    const hasNext = playMode === 'shuffle' || playQueueIndex + 1 < playQueue.length;
+    if (!hasNext) return;
+    const fadeSeconds = adaptiveCrossfadeSeconds(audioEngine.tailEnergy);
+    if (duration - currentTime > fadeSeconds + 0.2) return;
+    if (automaticTransitionTrack.current === currentTrackId) return;
+    automaticTransitionTrack.current = currentTrackId;
+    pendingCrossfade.current = fadeSeconds;
+    playNext();
+  }, [crossfadeEnabled, currentTime, currentTrackId, duration, isPlaying, playMode, playNext, playQueue.length, playQueueIndex]);
 
   // 标签更新后刷新数据
   const handleTagsUpdated = async () => {
@@ -302,6 +343,8 @@ export default function App() {
               nextLyric={immersiveLyrics.next}
               coverArt={coverArt}
               isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
               motionEnabled={reactiveMotionEnabled}
               onExit={() => setImmersiveMode(false)}
               onMotionChange={setReactiveMotionEnabled}
@@ -332,8 +375,8 @@ export default function App() {
         immersiveActive={immersiveMode}
         playMode={playMode}
         onTogglePlay={handleTogglePlay}
-        onNext={playNext}
-        onPrev={playPrev}
+        onNext={handleNext}
+        onPrev={handlePrev}
         onSeek={handleSeek}
         onVolumeChange={setVolume}
         onToggleLyrics={toggleLyrics}
