@@ -1,7 +1,7 @@
 // ===== Zustand 全局状态管理 =====
 import { create } from 'zustand';
 import { api } from '../lib/api';
-import type { Track, Playlist, ParsedLyrics } from '../lib/api';
+import type { Track, Playlist, ParsedLyrics, ResonanceLevel } from '../lib/api';
 
 // ---------- 类型别名 ----------
 export type View = 'library' | 'playlist' | 'recent' | 'frequent';
@@ -14,6 +14,10 @@ const savedBoolean = (key: string, fallback: boolean) => {
   const value = window.localStorage.getItem(key);
   return value === null ? fallback : value === 'true';
 };
+
+const resonanceUpdateGeneration = new Map<number, number>();
+const updateTrackResonance = (track: Track, id: number, resonance: ResonanceLevel): Track =>
+  track.id === id ? { ...track, resonance } : track;
 
 interface AppState {
   // ===== 库数据 =====
@@ -60,6 +64,7 @@ interface AppState {
   setTracks: (tracks: Track[]) => void;
   refreshLibrary: () => Promise<void>;
   setSortBy: (field: string) => void;
+  setTrackResonance: (trackId: number, resonance: ResonanceLevel) => Promise<void>;
   setSearchQuery: (query: string) => void;
 
   // ===== Actions: 选择 =====
@@ -159,6 +164,47 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return { sortBy: field, sortOrder: 'asc' };
     }),
+
+  setTrackResonance: async (trackId, resonance) => {
+    const generation = (resonanceUpdateGeneration.get(trackId) ?? 0) + 1;
+    resonanceUpdateGeneration.set(trackId, generation);
+    const before = get();
+    const previous = {
+      tracks: before.tracks.find((track) => track.id === trackId)?.resonance,
+      playlistTracks: before.playlistTracks.find((track) => track.id === trackId)?.resonance,
+      playQueue: before.playQueue.find((track) => track.id === trackId)?.resonance,
+      currentTrack: before.currentTrack?.id === trackId ? before.currentTrack.resonance : undefined,
+    };
+    set((state) => ({
+      tracks: state.tracks.map((track) => updateTrackResonance(track, trackId, resonance)),
+      playlistTracks: state.playlistTracks.map((track) => updateTrackResonance(track, trackId, resonance)),
+      playQueue: state.playQueue.map((track) => updateTrackResonance(track, trackId, resonance)),
+      currentTrack: state.currentTrack
+        ? updateTrackResonance(state.currentTrack, trackId, resonance)
+        : null,
+    }));
+    try {
+      await api.library.updateResonance(trackId, resonance);
+    } catch (error) {
+      if (resonanceUpdateGeneration.get(trackId) === generation) {
+        set((state) => ({
+          tracks: previous.tracks === undefined ? state.tracks : state.tracks.map(
+            (track) => updateTrackResonance(track, trackId, previous.tracks!),
+          ),
+          playlistTracks: previous.playlistTracks === undefined ? state.playlistTracks : state.playlistTracks.map(
+            (track) => updateTrackResonance(track, trackId, previous.playlistTracks!),
+          ),
+          playQueue: previous.playQueue === undefined ? state.playQueue : state.playQueue.map(
+            (track) => updateTrackResonance(track, trackId, previous.playQueue!),
+          ),
+          currentTrack: state.currentTrack && previous.currentTrack !== undefined
+            ? updateTrackResonance(state.currentTrack, trackId, previous.currentTrack)
+            : state.currentTrack,
+        }));
+      }
+      throw error;
+    }
+  },
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
