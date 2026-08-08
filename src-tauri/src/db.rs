@@ -28,6 +28,7 @@ pub struct Track {
     pub file_mtime: Option<i64>,
     pub added_at: Option<i64>,
     pub play_count: i64,
+    pub resonance: i64,
 }
 
 /// 监控文件夹
@@ -122,12 +123,13 @@ fn row_to_track(row: &Row) -> rusqlite::Result<Track> {
         file_mtime: row.get("file_mtime")?,
         added_at: row.get("added_at")?,
         play_count: row.get("play_count")?,
+        resonance: row.get("resonance")?,
     })
 }
 
 const TRACK_COLUMNS: &str = "path, file_name, title, artist, album, album_artist, folder_path, \
      genre, year, track_no, disc_no, duration, bitrate, sample_rate, has_lyrics, lyrics_type, \
-     file_mtime, added_at, play_count";
+     file_mtime, added_at, play_count, resonance";
 
 /// 列名白名单（防 SQL 注入）
 fn is_valid_column(col: &str) -> bool {
@@ -151,6 +153,7 @@ fn is_valid_column(col: &str) -> bool {
             | "file_mtime"
             | "added_at"
             | "play_count"
+            | "resonance"
     )
 }
 
@@ -188,7 +191,8 @@ pub fn init_db(app_data_dir: &std::path::Path) -> rusqlite::Result<Connection> {
             lyrics_type   TEXT,
             file_mtime    INTEGER,
             added_at      INTEGER,
-            play_count    INTEGER DEFAULT 0
+            play_count    INTEGER DEFAULT 0,
+            resonance     INTEGER NOT NULL DEFAULT 0 CHECK(resonance BETWEEN 0 AND 3)
         );
         CREATE INDEX IF NOT EXISTS idx_album       ON tracks(album);
         CREATE INDEX IF NOT EXISTS idx_folder_path ON tracks(folder_path);
@@ -225,6 +229,8 @@ pub fn init_db(app_data_dir: &std::path::Path) -> rusqlite::Result<Connection> {
         CREATE INDEX IF NOT EXISTS idx_pl_position ON playlist_tracks(playlist_id, position);",
     )?;
 
+    ensure_track_resonance_column(&conn)?;
+
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS playback_memory (
             track_id        INTEGER PRIMARY KEY,
@@ -240,6 +246,21 @@ pub fn init_db(app_data_dir: &std::path::Path) -> rusqlite::Result<Connection> {
 
     seed_builtin_eq(&conn)?;
     Ok(conn)
+}
+
+fn ensure_track_resonance_column(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(tracks)")?;
+    let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for column in columns {
+        if column? == "resonance" {
+            return Ok(());
+        }
+    }
+    conn.execute(
+        "ALTER TABLE tracks ADD COLUMN resonance INTEGER NOT NULL DEFAULT 0 CHECK(resonance BETWEEN 0 AND 3)",
+        [],
+    )?;
+    Ok(())
 }
 
 fn seed_builtin_eq(conn: &Connection) -> rusqlite::Result<()> {
@@ -275,7 +296,7 @@ pub fn insert_tracks(conn: &Connection, tracks: &[Track]) -> rusqlite::Result<()
     let tx = conn.unchecked_transaction()?;
     let sql = format!(
         "INSERT INTO tracks ({cols}) VALUES \
-         (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19) \
+         (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20) \
          ON CONFLICT(path) DO UPDATE SET \
            file_name=excluded.file_name, title=excluded.title, artist=excluded.artist, \
            album=excluded.album, album_artist=excluded.album_artist, folder_path=excluded.folder_path, \
@@ -307,6 +328,7 @@ pub fn insert_tracks(conn: &Connection, tracks: &[Track]) -> rusqlite::Result<()
                 t.file_mtime,
                 t.added_at.unwrap_or(0),
                 t.play_count,
+                t.resonance,
             ])?;
         }
     }
@@ -371,6 +393,26 @@ pub fn get_track_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Tr
         Some(Err(e)) => Err(e),
         None => Ok(None),
     }
+}
+
+pub fn update_track_resonance(
+    conn: &Connection,
+    track_id: i64,
+    resonance: i64,
+) -> rusqlite::Result<()> {
+    if !(0..=3).contains(&resonance) {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "resonance must be 0..=3".into(),
+        ));
+    }
+    let changed = conn.execute(
+        "UPDATE tracks SET resonance = ?1 WHERE id = ?2",
+        params![resonance, track_id],
+    )?;
+    if changed == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
 }
 
 /// 仅取路径（供 URI scheme handler 使用）
@@ -848,4 +890,42 @@ pub fn save_eq_preset(conn: &Connection, preset: &EqPreset) -> rusqlite::Result<
         params![preset.name, gains_json, builtin_int],
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_connection() -> Connection {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("soul-play-resonance-{nonce}"));
+        init_db(&dir).expect("initialize test database")
+    }
+
+    #[test]
+    fn resonance_defaults_updates_validates_and_survives_upsert() {
+        let conn = test_connection();
+        conn.execute(
+            "INSERT INTO tracks (path, file_name) VALUES (?1, ?2)",
+            params!["/music/song.mp3", "song.mp3"],
+        )
+        .unwrap();
+        let id = conn.last_insert_rowid();
+
+        assert_eq!(get_track_by_id(&conn, id).unwrap().unwrap().resonance, 0);
+        update_track_resonance(&conn, id, 3).unwrap();
+        assert_eq!(get_track_by_id(&conn, id).unwrap().unwrap().resonance, 3);
+        assert!(update_track_resonance(&conn, id, 4).is_err());
+
+        let mut rescanned = get_track_by_id(&conn, id).unwrap().unwrap();
+        rescanned.title = Some("Rescanned title".into());
+        insert_tracks(&conn, &[rescanned]).unwrap();
+        let after = get_track_by_id(&conn, id).unwrap().unwrap();
+        assert_eq!(after.title.as_deref(), Some("Rescanned title"));
+        assert_eq!(after.resonance, 3);
+    }
 }

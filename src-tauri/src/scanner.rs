@@ -78,5 +78,6 @@ pub fn build_track(path: &Path, mtime: i64) -> Option<Track> {
         file_mtime: Some(mtime),
         added_at: Some(now),
         play_count: 0,
+        resonance: 0,
     })
 }

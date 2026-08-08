@@ -159,6 +159,16 @@ pub fn library_query(
     db::query_tracks(&conn, &opts).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn library_update_resonance(
+    track_id: i64,
+    resonance: i64,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    db::update_track_resonance(&conn, track_id, resonance).map_err(|e| e.to_string())
+}
+
 /// 获取歌词（嵌入式优先，其次外部 .lrc）
 #[tauri::command]
 pub fn library_get_lyrics(

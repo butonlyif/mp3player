@@ -149,6 +149,7 @@ pub fn run() {
             commands::library_add_folder,
             commands::library_scan,
             commands::library_query,
+            commands::library_update_resonance,
             commands::library_get_lyrics,
             commands::library_get_track_path,
             commands::library_get_track_tags,

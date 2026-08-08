@@ -24,7 +24,10 @@ export interface Track {
   sample_rate: number | null;
   has_lyrics: number;
   lyrics_type: string | null;
+  resonance: ResonanceLevel;
 }
+
+export type ResonanceLevel = 0 | 1 | 2 | 3;
 
 /** 播放清单 */
 export interface Playlist {
@@ -114,6 +117,9 @@ export const api = {
     /** 查询曲目列表 */
     query: (opts: QueryOpts) =>
       invoke<Track[]>('library_query', { opts }),
+
+    updateResonance: (trackId: number, resonance: ResonanceLevel) =>
+      invoke<void>('library_update_resonance', { trackId, resonance }),
 
     /** 获取歌词 */
   getLyrics: (trackId: number) =>

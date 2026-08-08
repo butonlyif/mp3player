@@ -37,6 +37,7 @@ const track = (id: number, title: string, fields: Partial<Track> = {}): Track =>
   sample_rate: null,
   has_lyrics: 0,
   lyrics_type: null,
+  resonance: 0,
   ...fields,
 });
 

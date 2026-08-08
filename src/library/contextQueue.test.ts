@@ -20,6 +20,7 @@ const track = (id: number, file_name: string, fields: Partial<Track> = {}): Trac
   sample_rate: null,
   has_lyrics: 0,
   lyrics_type: null,
+  resonance: 0,
   ...fields,
 });
 
