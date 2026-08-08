@@ -24,3 +24,4 @@ src-tauri/gen/
 # Icons source (keep generated ones)
 src-tauri/icons/source-icon.png
 src-tauri/icons/icon.iconset/
+node_modules
