@@ -19,7 +19,7 @@ function formatDuration(sec: number): string {
 function getSortValue(track: Track, field: string): string | number {
   switch (field) {
     case 'file_name': return track.file_name.toLowerCase();
-    case 'title': return (track.title ?? '').toLowerCase();
+    case 'title': return trackDisplayTitle(track).toLowerCase();
     case 'album': return (track.album ?? '').toLowerCase();
     case 'artist': return (track.artist ?? '').toLowerCase();
     case 'duration': return track.duration;
@@ -364,6 +364,22 @@ export default function LibraryView() {
 // ============================================================
 // 专辑分组模式
 // ============================================================
+function ResonanceSortControl() {
+  const sortBy = useStore((s) => s.sortBy);
+  const sortOrder = useStore((s) => s.sortOrder);
+  const setSortBy = useStore((s) => s.setSortBy);
+  return (
+    <button
+      type="button"
+      className={`group-resonance-sort ${sortBy === 'resonance' ? 'active' : ''}`}
+      aria-label="按私人共鸣排序"
+      onClick={() => setSortBy('resonance')}
+    >
+      共鸣{sortBy === 'resonance' ? (sortOrder === 'desc' ? ' ▼' : ' ▲') : ''}
+    </button>
+  );
+}
+
 function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const sortBy = useStore((s) => s.sortBy);
@@ -390,6 +406,7 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
 
   return (
     <div className="album-view">
+      <div className="group-view-toolbar"><ResonanceSortControl /></div>
       <div className="album-list">
         {albums.map(album => {
           const isExpanded = expanded.has(album.key);
@@ -447,6 +464,7 @@ function FolderMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlay
   if (tracks.length === 0) return <div className="empty-state text-muted">无匹配结果</div>;
   return (
     <div className="folder-view">
+      <div className="group-view-toolbar"><ResonanceSortControl /></div>
       <div className="folder-list">
         <FolderNode node={tree} depth={0} nowPlayingId={nowPlayingId} onPlay={onPlay} />
       </div>

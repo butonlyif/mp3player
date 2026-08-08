@@ -110,7 +110,7 @@ interface AppState {
 export const useStore = create<AppState>((set, get) => ({
   // ===== 初始状态 =====
   tracks: [],
-  sortBy: 'file_name',
+  sortBy: 'title',
   sortOrder: 'asc',
   sortBeforeResonance: null,
   searchQuery: '',

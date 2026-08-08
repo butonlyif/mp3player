@@ -68,6 +68,22 @@ describe('LibraryView contextual playback queues', () => {
     expect(useStore.getState().playQueue).toEqual([]);
   });
 
+  it('sorts untitled tracks by the filename fallback shown in the title column', () => {
+    useStore.setState({
+      libraryMode: 'filename',
+      sortBy: 'title',
+      sortOrder: 'asc',
+      tracks: [
+        track(31, '', { title: null, file_name: 'Beta.mp3' }),
+        track(32, '', { title: null, file_name: 'Alpha.mp3' }),
+      ],
+    });
+
+    const { container } = render(<LibraryView />);
+    const titles = [...container.querySelectorAll('.track-body .col-title')].map((cell) => cell.textContent);
+    expect(titles).toEqual(['Alpha', 'Beta']);
+  });
+
   it('plays only the selected album in disc and track order', () => {
     const selected = track(2, '第二首', { album: '夜航', album_artist: '远岸', disc_no: 1, track_no: 2 });
     useStore.setState({
@@ -107,8 +123,8 @@ describe('LibraryView contextual playback queues', () => {
   it('sorts each album by resonance and uses the rendered order as its queue', () => {
     useStore.setState({
       libraryMode: 'album',
-      sortBy: 'resonance',
-      sortOrder: 'desc',
+      sortBy: 'title',
+      sortOrder: 'asc',
       tracks: [
         track(21, '有感觉', { album: '共鸣测试', resonance: 1, track_no: 1 }),
         track(22, '灵魂曲', { album: '共鸣测试', resonance: 3, track_no: 2 }),
@@ -117,6 +133,7 @@ describe('LibraryView contextual playback queues', () => {
     });
 
     render(<LibraryView />);
+    fireEvent.click(screen.getByRole('button', { name: '按私人共鸣排序' }));
     fireEvent.click(screen.getByText('共鸣测试'));
     fireEvent.doubleClick(screen.getByText('共鸣'));
 
