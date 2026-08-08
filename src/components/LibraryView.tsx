@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { api } from '../lib/api';
 import type { Track, Playlist } from '../lib/api';
 import { folderQueue, sortAlbumQueue } from '../library/contextQueue';
-import { trackDisplayTitle } from '../library/resonance';
+import { sortByResonanceStable, trackDisplayTitle } from '../library/resonance';
 import ResonanceMark from './ResonanceMark';
 
 // ---------- 工具函数 ----------
@@ -23,6 +23,7 @@ function getSortValue(track: Track, field: string): string | number {
     case 'album': return (track.album ?? '').toLowerCase();
     case 'artist': return (track.artist ?? '').toLowerCase();
     case 'duration': return track.duration;
+    case 'resonance': return track.resonance;
     case 'folder_path':
       // 只取最后一级目录名排序，避免同目录文件被完整路径打散
       if (track.folder_path) {
@@ -109,7 +110,7 @@ export default function LibraryView() {
         (t.album?.toLowerCase().includes(q) ?? false)
       );
     }
-    if (view === 'recent' || view === 'frequent') return [...result];
+    if ((view === 'recent' || view === 'frequent') && sortBy !== 'resonance') return [...result];
     const dir = sortOrder === 'asc' ? 1 : -1;
     return [...result].sort((a, b) => {
       const va = getSortValue(a, sortBy);
@@ -195,6 +196,7 @@ export default function LibraryView() {
 
   // 列定义
   const columns = [
+    { key: 'resonance', label: '共鸣', className: 'col-resonance' },
     { key: 'title', label: '标题', className: 'col-title' },
     { key: 'artist', label: '艺术家', className: 'col-artist' },
     { key: 'album', label: '专辑', className: 'col-album' },
@@ -297,7 +299,7 @@ export default function LibraryView() {
                 onDoubleClick={() => handleDoubleClick(track)}
                 onContextMenu={(e) => handleContextMenu(e, track)}
               >
-                <div className="track-cell col-title" title={trackDisplayTitle(track)}>
+                <div className="track-cell col-resonance">
                   <ResonanceMark
                     level={track.resonance}
                     onChange={(level) => {
@@ -307,6 +309,8 @@ export default function LibraryView() {
                       });
                     }}
                   />
+                </div>
+                <div className="track-cell col-title" title={trackDisplayTitle(track)}>
                   <span className="truncate">{trackDisplayTitle(track)}</span>
                 </div>
                 <div className="track-cell col-artist truncate" title={track.artist ?? ''}>{track.artist || '—'}</div>
@@ -362,6 +366,9 @@ export default function LibraryView() {
 // ============================================================
 function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const sortBy = useStore((s) => s.sortBy);
+  const sortOrder = useStore((s) => s.sortOrder);
+  const setTrackResonance = useStore((s) => s.setTrackResonance);
 
   const albums = useMemo<AlbumGroup[]>(() => {
     const map = new Map<string, AlbumGroup>();
@@ -386,7 +393,9 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
       <div className="album-list">
         {albums.map(album => {
           const isExpanded = expanded.has(album.key);
-          const albumQueue = sortAlbumQueue(album.tracks);
+          const albumQueue = sortBy === 'resonance'
+            ? sortByResonanceStable(album.tracks, sortOrder)
+            : sortAlbumQueue(album.tracks);
           return (
             <div key={album.key} className="album-group">
               <div className="album-header list-row" onClick={() => toggleExpand(album.key)}>
@@ -412,7 +421,11 @@ function AlbumMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlayi
                       onDoubleClick={() => onPlay(track, albumQueue)}
                     >
                       <span className="album-track-no text-muted">{track.track_no ?? '–'}</span>
-                      <span className="album-track-title truncate">{track.title || track.file_name}</span>
+                      <ResonanceMark
+                        level={track.resonance}
+                        onChange={(level) => setTrackResonance(track.id, level).catch(() => window.alert('评价保存失败，请重试'))}
+                      />
+                      <span className="album-track-title truncate">{trackDisplayTitle(track)}</span>
                       <span className="album-track-duration text-muted">{formatDuration(track.duration)}</span>
                     </div>
                   ))}
@@ -443,7 +456,14 @@ function FolderMode({ tracks, nowPlayingId, onPlay }: { tracks: Track[]; nowPlay
 
 function FolderNode({ node, depth, nowPlayingId, onPlay }: { node: TreeNode; depth: number; nowPlayingId: number | null; onPlay: (track: Track, queue: Track[]) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const sortBy = useStore((s) => s.sortBy);
+  const sortOrder = useStore((s) => s.sortOrder);
+  const setTrackResonance = useStore((s) => s.setTrackResonance);
   const childNodes = useMemo(() => [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name)), [node.children]);
+  const directTracks = useMemo(
+    () => sortBy === 'resonance' ? sortByResonanceStable(node.tracks, sortOrder) : folderQueue(node.tracks),
+    [node.tracks, sortBy, sortOrder],
+  );
   const hasChildren = childNodes.length > 0;
   const hasTracks = node.tracks.length > 0;
   const canExpand = hasChildren || hasTracks;
@@ -462,15 +482,19 @@ function FolderNode({ node, depth, nowPlayingId, onPlay }: { node: TreeNode; dep
       </div>
       {expanded && (
         <div className="folder-content">
-          {hasTracks && node.tracks.map(track => (
+          {hasTracks && directTracks.map(track => (
             <div
               key={track.id}
               className={`folder-track list-row ${nowPlayingId === track.id ? 'playing' : ''}`}
               style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
-              onDoubleClick={() => onPlay(track, folderQueue(node.tracks))}
+              onDoubleClick={() => onPlay(track, directTracks)}
             >
               <span className="folder-track-icon">♪</span>
-              <span className="folder-track-title truncate">{track.title || track.file_name}</span>
+              <ResonanceMark
+                level={track.resonance}
+                onChange={(level) => setTrackResonance(track.id, level).catch(() => window.alert('评价保存失败，请重试'))}
+              />
+              <span className="folder-track-title truncate">{trackDisplayTitle(track)}</span>
               <span className="folder-track-duration text-muted">{formatDuration(track.duration)}</span>
             </div>
           ))}

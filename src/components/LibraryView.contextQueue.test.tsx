@@ -103,4 +103,24 @@ describe('LibraryView contextual playback queues', () => {
     expect(useStore.getState().playQueue.map((item) => item.id)).toEqual([10, 11]);
     expect(useStore.getState().currentTrack?.id).toBe(11);
   });
+
+  it('sorts each album by resonance and uses the rendered order as its queue', () => {
+    useStore.setState({
+      libraryMode: 'album',
+      sortBy: 'resonance',
+      sortOrder: 'desc',
+      tracks: [
+        track(21, '有感觉', { album: '共鸣测试', resonance: 1, track_no: 1 }),
+        track(22, '灵魂曲', { album: '共鸣测试', resonance: 3, track_no: 2 }),
+        track(23, '共鸣', { album: '共鸣测试', resonance: 2, track_no: 3 }),
+      ],
+    });
+
+    render(<LibraryView />);
+    fireEvent.click(screen.getByText('共鸣测试'));
+    fireEvent.doubleClick(screen.getByText('共鸣'));
+
+    expect(useStore.getState().playQueue.map((item) => item.id)).toEqual([22, 23, 21]);
+    expect(screen.getAllByRole('button', { name: /点击修改/ })).toHaveLength(3);
+  });
 });

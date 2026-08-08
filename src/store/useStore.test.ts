@@ -80,3 +80,18 @@ describe('track resonance state', () => {
     expect(useStore.getState().playQueue[0].resonance).toBe(1);
   });
 });
+
+describe('resonance sorting', () => {
+  it('cycles high-to-low, low-to-high, then restores the previous sort', () => {
+    useStore.setState({ sortBy: 'album', sortOrder: 'asc', sortBeforeResonance: null });
+
+    useStore.getState().setSortBy('resonance');
+    expect(useStore.getState()).toMatchObject({ sortBy: 'resonance', sortOrder: 'desc' });
+
+    useStore.getState().setSortBy('resonance');
+    expect(useStore.getState()).toMatchObject({ sortBy: 'resonance', sortOrder: 'asc' });
+
+    useStore.getState().setSortBy('resonance');
+    expect(useStore.getState()).toMatchObject({ sortBy: 'album', sortOrder: 'asc', sortBeforeResonance: null });
+  });
+});

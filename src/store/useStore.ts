@@ -24,6 +24,7 @@ interface AppState {
   tracks: Track[];
   sortBy: string;
   sortOrder: SortOrder;
+  sortBeforeResonance: { field: string; order: SortOrder } | null;
   searchQuery: string;
   selectedTrackIds: Set<number>;
   _lastSelectedId: number | null;
@@ -111,6 +112,7 @@ export const useStore = create<AppState>((set, get) => ({
   tracks: [],
   sortBy: 'file_name',
   sortOrder: 'asc',
+  sortBeforeResonance: null,
   searchQuery: '',
   selectedTrackIds: new Set<number>(),
   _lastSelectedId: null,
@@ -159,10 +161,26 @@ export const useStore = create<AppState>((set, get) => ({
 
   setSortBy: (field) =>
     set((state) => {
+      if (field === 'resonance') {
+        if (state.sortBy !== 'resonance') {
+          return {
+            sortBy: 'resonance',
+            sortOrder: 'desc',
+            sortBeforeResonance: { field: state.sortBy, order: state.sortOrder },
+          };
+        }
+        if (state.sortOrder === 'desc') return { sortOrder: 'asc' };
+        const previous = state.sortBeforeResonance ?? { field: 'title', order: 'asc' as SortOrder };
+        return {
+          sortBy: previous.field,
+          sortOrder: previous.order,
+          sortBeforeResonance: null,
+        };
+      }
       if (state.sortBy === field) {
         return { sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc' };
       }
-      return { sortBy: field, sortOrder: 'asc' };
+      return { sortBy: field, sortOrder: 'asc', sortBeforeResonance: null };
     }),
 
   setTrackResonance: async (trackId, resonance) => {

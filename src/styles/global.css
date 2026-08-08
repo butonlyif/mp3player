@@ -670,7 +670,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .track-header {
   display: grid;
-  grid-template-columns: 2.8fr 1.5fr 1.5fr 1.2fr 64px;
+  grid-template-columns: 48px 2.8fr 1.5fr 1.5fr 1.2fr 64px;
   padding: 0 16px;
   height: 32px;
   align-items: center;
@@ -708,7 +708,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .track-row {
   display: grid;
-  grid-template-columns: 2.8fr 1.5fr 1.5fr 1.2fr 64px;
+  grid-template-columns: 48px 2.8fr 1.5fr 1.5fr 1.2fr 64px;
   padding: 0 16px;
   height: 32px;
   align-items: center;
@@ -729,6 +729,16 @@ input[type='range']::-webkit-slider-thumb:hover {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.col-resonance {
+  text-align: center;
+}
+
+.track-cell.col-resonance {
+  display: flex;
+  justify-content: center;
+  padding: 0;
 }
 
 /* 私人共鸣：灵魂刻度 */
@@ -918,7 +928,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .album-track {
   display: grid;
-  grid-template-columns: 28px 1fr 56px;
+  grid-template-columns: 28px 22px 1fr 56px;
   align-items: center;
   padding: 4px 12px;
   border-radius: var(--radius-xs);
@@ -1057,6 +1067,22 @@ input[type='range']::-webkit-slider-thumb:hover {
   font-size: 13px;
 }
 
+.playlist-resonance-sort {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.playlist-resonance-sort:hover,
+.playlist-resonance-sort.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
 .playlist-body {
   flex: 1;
   overflow-y: auto;
@@ -1065,7 +1091,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .playlist-row {
   display: grid;
-  grid-template-columns: 36px 2fr 1.5fr 1.5fr 56px;
+  grid-template-columns: 36px 28px 2fr 1.5fr 1.5fr 56px;
   padding: 0 16px;
   height: 34px;
   align-items: center;
@@ -1094,6 +1120,12 @@ input[type='range']::-webkit-slider-thumb:hover {
 .pl-cell-index {
   font-size: 12px;
   text-align: center;
+}
+
+.pl-cell-resonance {
+  display: flex;
+  justify-content: center;
+  padding: 0;
 }
 
 .pl-cell-duration {

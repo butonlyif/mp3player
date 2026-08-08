@@ -3,6 +3,8 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../lib/api';
 import type { Track } from '../lib/api';
+import { sortByResonanceStable, trackDisplayTitle } from '../library/resonance';
+import ResonanceMark from './ResonanceMark';
 
 /** 格式化时长 */
 function formatDuration(sec: number): string {
@@ -28,6 +30,10 @@ export default function PlaylistView() {
   const currentTrack = useStore((s) => s.currentTrack);
   const setPlaylistTracks = useStore((s) => s.setPlaylistTracks);
   const playTrack = useStore((s) => s.playTrack);
+  const sortBy = useStore((s) => s.sortBy);
+  const sortOrder = useStore((s) => s.sortOrder);
+  const setSortBy = useStore((s) => s.setSortBy);
+  const setTrackResonance = useStore((s) => s.setTrackResonance);
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -44,10 +50,16 @@ export default function PlaylistView() {
   );
 
   const nowPlayingId = currentTrack?.id ?? null;
+  const visiblePlaylistTracks = useMemo(
+    () => sortBy === 'resonance'
+      ? sortByResonanceStable(playlistTracks, sortOrder)
+      : playlistTracks,
+    [playlistTracks, sortBy, sortOrder],
+  );
 
   // 双击播放
   const handleDoubleClick = (track: Track) => {
-    playTrack(track, playlistTracks);
+    playTrack(track, visiblePlaylistTracks);
   };
 
   // 右键菜单：移除
@@ -125,6 +137,14 @@ export default function PlaylistView() {
         <span className="playlist-stats text-muted">
           {playlistTracks.length} 首 · {formatTotalDuration(totalDuration)}
         </span>
+        <button
+          type="button"
+          className={`playlist-resonance-sort ${sortBy === 'resonance' ? 'active' : ''}`}
+          onClick={() => setSortBy('resonance')}
+          title="按私人共鸣排序"
+        >
+          共鸣{sortBy === 'resonance' ? (sortOrder === 'desc' ? ' ▼' : ' ▲') : ''}
+        </button>
       </div>
 
       {/* 曲目列表 */}
@@ -134,7 +154,7 @@ export default function PlaylistView() {
             播放清单为空，从音乐库添加曲目
           </div>
         ) : (
-          playlistTracks.map((track, index) => (
+          visiblePlaylistTracks.map((track, index) => (
             <div
               key={track.id}
               className={`playlist-row list-row ${
@@ -142,7 +162,7 @@ export default function PlaylistView() {
               } ${dragIndex === index ? 'dragging' : ''} ${
                 dragOverIndex === index && dragIndex !== null ? 'drag-over' : ''
               }`}
-              draggable
+              draggable={sortBy !== 'resonance'}
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={() => handleDrop(index)}
@@ -151,8 +171,14 @@ export default function PlaylistView() {
               onContextMenu={(e) => handleContextMenu(e, track.id)}
             >
               <div className="pl-cell pl-cell-index text-muted">{index + 1}</div>
-              <div className="pl-cell pl-cell-title truncate" title={track.title ?? ''}>
-                {track.title || track.file_name}
+              <div className="pl-cell pl-cell-resonance">
+                <ResonanceMark
+                  level={track.resonance}
+                  onChange={(level) => setTrackResonance(track.id, level).catch(() => window.alert('评价保存失败，请重试'))}
+                />
+              </div>
+              <div className="pl-cell pl-cell-title truncate" title={trackDisplayTitle(track)}>
+                {trackDisplayTitle(track)}
               </div>
               <div className="pl-cell pl-cell-artist truncate text-muted" title={track.artist ?? ''}>
                 {track.artist || '—'}
