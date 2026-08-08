@@ -670,7 +670,7 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .track-header {
   display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.2fr 64px;
+  grid-template-columns: 2.8fr 1.5fr 1.5fr 1.2fr 64px;
   padding: 0 16px;
   height: 32px;
   align-items: center;
@@ -708,14 +708,14 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .track-row {
   display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.2fr 64px;
+  grid-template-columns: 2.8fr 1.5fr 1.5fr 1.2fr 64px;
   padding: 0 16px;
   height: 32px;
   align-items: center;
   cursor: default;
 }
 
-.track-row.playing .col-file {
+.track-row.playing .col-title {
   color: var(--accent);
   font-weight: 500;
 }
@@ -723,6 +723,127 @@ input[type='range']::-webkit-slider-thumb:hover {
 .track-cell {
   padding: 0 8px;
   font-size: 13px;
+}
+
+.track-cell.col-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 私人共鸣：灵魂刻度 */
+.resonance-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  flex: 0 0 22px;
+  z-index: 3;
+}
+
+.resonance-mark-main,
+.resonance-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.resonance-mark-main {
+  width: 18px;
+  height: 28px;
+}
+
+.resonance-line {
+  display: block;
+  width: 3px;
+  border-radius: 999px;
+  transition: height 140ms ease, opacity 140ms ease, filter 140ms ease;
+}
+
+.resonance-line.level-0 {
+  height: 10px;
+  opacity: 0;
+  background: rgba(199, 196, 216, 0.28);
+}
+
+.resonance-line.level-1 {
+  height: 12px;
+  background: #62cbd1;
+  opacity: 0.88;
+}
+
+.resonance-line.level-2 {
+  height: 19px;
+  background: linear-gradient(180deg, #66d3d5, #aa78ea);
+  box-shadow: 0 0 7px rgba(166, 116, 231, 0.32);
+}
+
+.resonance-line.level-3 {
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(180deg, #ff7db8, #a674ff);
+  box-shadow: 0 0 10px rgba(245, 113, 181, 0.6);
+}
+
+.resonance-mark:hover .resonance-mark-main .level-0,
+.resonance-mark:focus-within .resonance-mark-main .level-0 {
+  opacity: 1;
+}
+
+.resonance-picker {
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(20, 18, 29, 0.96);
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.94);
+  transform-origin: left center;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.resonance-mark:hover .resonance-picker,
+.resonance-mark:focus-within .resonance-picker {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.resonance-mark:hover .resonance-mark-main,
+.resonance-mark:focus-within .resonance-mark-main {
+  opacity: 0;
+}
+
+.resonance-choice {
+  width: 17px;
+  height: 25px;
+  border-radius: 5px;
+}
+
+.resonance-choice:hover,
+.resonance-choice:focus-visible,
+.resonance-choice.active {
+  background: rgba(255, 255, 255, 0.09);
+  outline: none;
+}
+
+.resonance-choice .level-0 {
+  height: 3px;
+  width: 8px;
+  opacity: 0.7;
 }
 
 .track-cell.col-duration {

@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { api } from '../lib/api';
 import type { Track, Playlist } from '../lib/api';
 import { folderQueue, sortAlbumQueue } from '../library/contextQueue';
+import { trackDisplayTitle } from '../library/resonance';
+import ResonanceMark from './ResonanceMark';
 
 // ---------- 工具函数 ----------
 
@@ -73,6 +75,7 @@ export default function LibraryView() {
   const playlists = useStore((s) => s.playlists);
 
   const setSortBy = useStore((s) => s.setSortBy);
+  const setTrackResonance = useStore((s) => s.setTrackResonance);
   const selectTrack = useStore((s) => s.selectTrack);
   const selectRange = useStore((s) => s.selectRange);
   const clearSelection = useStore((s) => s.clearSelection);
@@ -192,7 +195,6 @@ export default function LibraryView() {
 
   // 列定义
   const columns = [
-    { key: 'file_name', label: '文件名', className: 'col-file' },
     { key: 'title', label: '标题', className: 'col-title' },
     { key: 'artist', label: '艺术家', className: 'col-artist' },
     { key: 'album', label: '专辑', className: 'col-album' },
@@ -295,8 +297,18 @@ export default function LibraryView() {
                 onDoubleClick={() => handleDoubleClick(track)}
                 onContextMenu={(e) => handleContextMenu(e, track)}
               >
-                <div className="track-cell col-file truncate" title={track.file_name}>{track.file_name}</div>
-                <div className="track-cell col-title truncate" title={track.title ?? ''}>{track.title || '—'}</div>
+                <div className="track-cell col-title" title={trackDisplayTitle(track)}>
+                  <ResonanceMark
+                    level={track.resonance}
+                    onChange={(level) => {
+                      setTrackResonance(track.id, level).catch((error) => {
+                        console.error('保存共鸣评价失败:', error);
+                        window.alert('评价保存失败，请重试');
+                      });
+                    }}
+                  />
+                  <span className="truncate">{trackDisplayTitle(track)}</span>
+                </div>
                 <div className="track-cell col-artist truncate" title={track.artist ?? ''}>{track.artist || '—'}</div>
                 <div className="track-cell col-album truncate" title={track.album ?? ''}>{track.album || '—'}</div>
                 <div className="track-cell col-folder truncate text-muted" title={track.folder_path ?? ''}>

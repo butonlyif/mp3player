@@ -15,6 +15,7 @@ vi.hoisted(() => {
     },
   });
 });
+import { api } from '../lib/api';
 import type { Track } from '../lib/api';
 import { useStore } from '../store/useStore';
 import LibraryView from './LibraryView';
@@ -43,10 +44,30 @@ const track = (id: number, title: string, fields: Partial<Track> = {}): Track =>
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   useStore.setState({ tracks: [], currentTrack: null, playQueue: [], playQueueIndex: 0, searchQuery: '' });
 });
 
 describe('LibraryView contextual playback queues', () => {
+  it('merges filename fallback into the title column and isolates resonance clicks', () => {
+    vi.spyOn(api.library, 'updateResonance').mockResolvedValue(undefined);
+    useStore.setState({
+      libraryMode: 'filename',
+      tracks: [track(9, '', { title: null, file_name: 'Fallback.demo.mp3', resonance: 2 })],
+      selectedTrackIds: new Set(),
+      playQueue: [],
+    });
+
+    render(<LibraryView />);
+
+    expect(screen.queryByText('文件名')).not.toBeInTheDocument();
+    expect(screen.getByText('Fallback.demo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '共鸣 · 点击修改' }));
+    expect(api.library.updateResonance).toHaveBeenCalledWith(9, 3);
+    expect(useStore.getState().selectedTrackIds.size).toBe(0);
+    expect(useStore.getState().playQueue).toEqual([]);
+  });
+
   it('plays only the selected album in disc and track order', () => {
     const selected = track(2, '第二首', { album: '夜航', album_artist: '远岸', disc_no: 1, track_no: 2 });
     useStore.setState({
