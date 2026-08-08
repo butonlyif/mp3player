@@ -16,4 +16,14 @@ describe('ParticlePool', () => {
     for (let index = 0; index < 200; index += 1) pool.update(0, 0, 34, 800, 500);
     expect(pool.activeCount).toBe(0);
   });
+
+  it('creates a visible fast meteor from moderate treble', () => {
+    const pool = new ParticlePool(8, () => 0.5);
+    pool.update(0.42, 0, 250, 800, 500);
+
+    let speed = 0;
+    pool.forEachActive((particle) => { speed = Math.hypot(particle.vx, particle.vy); });
+    expect(pool.activeCount).toBeGreaterThan(0);
+    expect(speed).toBeGreaterThan(80);
+  });
 });

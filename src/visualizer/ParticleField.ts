@@ -8,14 +8,16 @@ interface Particle {
   vy: number;
   life: number;
   size: number;
+  tail: number;
 }
 
 export class ParticlePool {
   private readonly particles: Particle[];
+  private spawnCooldownMs = 0;
 
   constructor(limit = 36, private readonly random = Math.random) {
     this.particles = Array.from({ length: Math.max(0, limit) }, () => ({
-      active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, size: 1,
+      active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, size: 1, tail: 20,
     }));
   }
 
@@ -26,8 +28,11 @@ export class ParticlePool {
   }
 
   update(treble: number, beat: number, dtMs: number, width: number, height: number): void {
-    const spawnCount = beat > 0 ? 7 : treble > 0.68 ? 1 : 0;
+    this.spawnCooldownMs = Math.max(0, this.spawnCooldownMs - dtMs);
+    const trebleMeteor = treble > 0.28 && this.spawnCooldownMs === 0;
+    const spawnCount = beat > 0 ? 6 : trebleMeteor ? 1 : 0;
     for (let index = 0; index < spawnCount; index += 1) this.spawn(width, height, treble);
+    if (spawnCount > 0) this.spawnCooldownMs = beat > 0 ? 120 : 190;
     const dt = Math.min(50, Math.max(0, dtMs)) / 1_000;
     for (const particle of this.particles) {
       if (!particle.active) continue;
@@ -50,15 +55,16 @@ export class ParticlePool {
   private spawn(width: number, height: number, treble: number): void {
     const particle = this.particles.find((item) => !item.active);
     if (!particle) return;
-    const angle = this.random() * Math.PI * 2;
-    const speed = 12 + this.random() * (28 + treble * 24);
+    const angle = 2.24 + (this.random() - 0.5) * 0.52;
+    const speed = 100 + this.random() * (120 + treble * 100);
     particle.active = true;
-    particle.x = width * (0.35 + this.random() * 0.3);
-    particle.y = height * (0.38 + this.random() * 0.3);
+    particle.x = width * (0.58 + this.random() * 0.38);
+    particle.y = height * (0.04 + this.random() * 0.42);
     particle.vx = Math.cos(angle) * speed;
     particle.vy = Math.sin(angle) * speed;
-    particle.life = 0.55 + this.random() * 0.45;
-    particle.size = 0.8 + this.random() * 2.2;
+    particle.life = 0.72 + this.random() * 0.58;
+    particle.size = 1.1 + this.random() * 1.9;
+    particle.tail = 22 + this.random() * (34 + treble * 34);
   }
 }
 
@@ -95,21 +101,35 @@ export class ParticleField {
     const blue = 255 * weights.calm + 145 * weights.warm + 235 * weights.melancholic + 238 * weights.energetic;
     const hue = `${Math.round(red)} ${Math.round(green)} ${Math.round(blue)}`;
     this.context.fillStyle = `rgb(${hue})`;
+    this.context.strokeStyle = `rgb(${hue})`;
+    this.context.lineCap = 'round';
+    this.context.shadowColor = `rgb(${hue})`;
+    this.context.shadowBlur = 4;
     this.pool.forEachActive((particle) => {
       this.context!.globalAlpha = Math.max(0, particle.life) * (0.5 + weights.energetic * 0.3);
+      const speed = Math.hypot(particle.vx, particle.vy) || 1;
+      const tailX = particle.x - (particle.vx / speed) * particle.tail;
+      const tailY = particle.y - (particle.vy / speed) * particle.tail;
+      this.context!.lineWidth = Math.max(0.8, particle.size * 0.72);
+      this.context!.beginPath();
+      this.context!.moveTo(tailX, tailY);
+      this.context!.lineTo(particle.x, particle.y);
+      this.context!.stroke();
       this.context!.beginPath();
       this.context!.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
       this.context!.fill();
     });
     if (this.ringLife > 0) {
-      this.context.globalAlpha = this.ringLife * 0.24;
+      this.context.shadowBlur = 0;
+      this.context.globalAlpha = this.ringLife * 0.42;
       this.context.strokeStyle = `rgb(${hue})`;
-      this.context.lineWidth = 1;
+      this.context.lineWidth = 1.6;
       this.context.beginPath();
       this.context.arc(this.width / 2, this.height / 2, (1 - this.ringLife) * Math.min(this.width, this.height) * 0.38, 0, Math.PI * 2);
       this.context.stroke();
       this.ringLife = Math.max(0, this.ringLife - dtMs / 720);
     }
+    this.context.shadowBlur = 0;
     this.context.globalAlpha = 1;
   }
 

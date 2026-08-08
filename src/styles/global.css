@@ -1011,9 +1011,9 @@ input[type='range']::-webkit-slider-thumb:hover {
   position: absolute;
   z-index: -1;
   left: 0;
-  bottom: -46px;
-  width: 34%;
-  height: 70px;
+  bottom: -38px;
+  width: 58%;
+  height: 104px;
   background: var(--ambient-color, var(--accent));
   opacity: var(--ambient-haze-opacity, 0);
   filter: blur(30px);
@@ -1112,6 +1112,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   flex: 1;
   height: 4px;
   border-radius: 2px;
+  box-shadow: 0 0 var(--ambient-glow, 4px) color-mix(in srgb, var(--ambient-color, var(--accent)) 28%, transparent);
 }
 
 .playerbar-right {
@@ -1206,7 +1207,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   left: -12%;
   top: -24%;
   background: var(--liquid-color-1);
-  animation: liquid-drift-one 14s ease-in-out infinite alternate;
+  animation: liquid-drift-one 7s ease-in-out infinite alternate;
   box-shadow: 0 0 150px rgb(255 160 112 / var(--liquid-warm-glow));
 }
 
@@ -1214,7 +1215,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   right: -18%;
   top: 8%;
   background: var(--liquid-color-2);
-  animation: liquid-drift-two 17s ease-in-out infinite alternate;
+  animation: liquid-drift-two 9s ease-in-out infinite alternate;
   box-shadow: 0 0 170px rgb(74 238 225 / var(--liquid-energetic-glow));
 }
 
@@ -1222,7 +1223,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   left: 22%;
   bottom: -45%;
   background: var(--liquid-color-3);
-  animation: liquid-drift-three 19s ease-in-out infinite alternate;
+  animation: liquid-drift-three 11s ease-in-out infinite alternate;
   box-shadow: 0 0 160px rgb(66 80 188 / var(--liquid-blue-glow));
 }
 

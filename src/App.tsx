@@ -118,9 +118,9 @@ export default function App() {
       const signal = analyzer.update(data, now);
       root.style.setProperty('--ambient-bass', signal.bass.toFixed(3));
       root.style.setProperty('--ambient-energy', signal.energy.toFixed(3));
-      root.style.setProperty('--ambient-scale', (1 + signal.bass * 0.035).toFixed(4));
-      root.style.setProperty('--ambient-haze-opacity', (signal.energy * 0.12).toFixed(3));
-      root.style.setProperty('--ambient-glow', `${(4 + signal.energy * 14).toFixed(1)}px`);
+      root.style.setProperty('--ambient-scale', (1 + signal.bass * 0.075).toFixed(4));
+      root.style.setProperty('--ambient-haze-opacity', (0.06 + signal.energy * 0.32).toFixed(3));
+      root.style.setProperty('--ambient-glow', `${(6 + signal.energy * 26).toFixed(1)}px`);
       frameId = requestAnimationFrame(frame);
     };
     const onVisibility = () => {

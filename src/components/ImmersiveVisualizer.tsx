@@ -122,9 +122,9 @@ export default function ImmersiveVisualizer({
       root.style.setProperty('--liquid-warm', mood.weights.warm.toFixed(3));
       root.style.setProperty('--liquid-melancholic', mood.weights.melancholic.toFixed(3));
       root.style.setProperty('--liquid-energetic', mood.weights.energetic.toFixed(3));
-      root.style.setProperty('--liquid-fog-opacity', (0.3 + signal.energy * 0.22 + mood.weights.energetic * 0.08).toFixed(3));
-      root.style.setProperty('--liquid-cover-opacity', (0.1 + signal.energy * 0.08).toFixed(3));
-      root.style.setProperty('--liquid-scale', (1 + signal.bass * 0.012).toFixed(4));
+      root.style.setProperty('--liquid-fog-opacity', (0.42 + signal.energy * 0.35 + mood.weights.energetic * 0.12).toFixed(3));
+      root.style.setProperty('--liquid-cover-opacity', (0.18 + signal.energy * 0.16).toFixed(3));
+      root.style.setProperty('--liquid-scale', (1 + signal.bass * 0.025).toFixed(4));
       root.style.setProperty('--liquid-warm-glow', (mood.weights.warm * 0.34).toFixed(3));
       root.style.setProperty('--liquid-energetic-glow', (mood.weights.energetic * 0.35).toFixed(3));
       root.style.setProperty('--liquid-blue-glow', ((mood.weights.calm + mood.weights.melancholic) * 0.24).toFixed(3));
@@ -161,7 +161,7 @@ export default function ImmersiveVisualizer({
     '--liquid-color-3': 'rgb(38 128 132)',
     '--liquid-energy': '0', '--liquid-bass': '0', '--liquid-mid': '0',
     '--liquid-calm': '1', '--liquid-warm': '0', '--liquid-melancholic': '0', '--liquid-energetic': '0',
-    '--liquid-fog-opacity': '0.3', '--liquid-cover-opacity': '0.1', '--liquid-scale': '1',
+    '--liquid-fog-opacity': '0.42', '--liquid-cover-opacity': '0.18', '--liquid-scale': '1',
     '--liquid-warm-glow': '0', '--liquid-energetic-glow': '0', '--liquid-blue-glow': '0.24',
   };
 
