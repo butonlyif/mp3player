@@ -118,6 +118,23 @@ describe('track resonance state', () => {
     expect(useStore.getState().playQueue.map((item) => item.id)).toEqual([11, 13, 12]);
     expect(useStore.getState().playQueueIndex).toBe(2);
   });
+
+  it('uses the matching playlist reference as rollback baseline', async () => {
+    vi.spyOn(api.library, 'updateResonance').mockRejectedValue(new Error('write failed'));
+    const target = track(99, 2);
+    useStore.setState({
+      tracks: [],
+      playlistTracks: [target],
+      playQueue: [target],
+      currentTrack: track(100, 3),
+      sortBy: 'title',
+    });
+
+    await expect(useStore.getState().setTrackResonance(99, 1)).rejects.toThrow('write failed');
+
+    expect(useStore.getState().playlistTracks[0].resonance).toBe(2);
+    expect(useStore.getState().currentTrack?.resonance).toBe(3);
+  });
 });
 
 describe('resonance sorting', () => {

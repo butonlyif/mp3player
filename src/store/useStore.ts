@@ -192,7 +192,9 @@ export const useStore = create<AppState>((set, get) => ({
     const before = get();
     if (!resonanceConfirmedLevels.has(trackId)) {
       const baseline = before.tracks.find((track) => track.id === trackId)?.resonance
-        ?? before.currentTrack?.resonance
+        ?? before.playlistTracks.find((track) => track.id === trackId)?.resonance
+        ?? before.playQueue.find((track) => track.id === trackId)?.resonance
+        ?? (before.currentTrack?.id === trackId ? before.currentTrack.resonance : undefined)
         ?? 0;
       resonanceConfirmedLevels.set(trackId, baseline);
     }
