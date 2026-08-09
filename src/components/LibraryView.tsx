@@ -6,6 +6,9 @@ import type { Track, Playlist } from '../lib/api';
 import { folderQueue, sortAlbumQueue } from '../library/contextQueue';
 import { sortByResonanceStable, trackDisplayTitle } from '../library/resonance';
 import ResonanceMark from './ResonanceMark';
+import { useMarqueeSelection } from '../selection/useMarqueeSelection';
+import { contextSelectionIds } from '../selection/selectionModel';
+import Icon from './Icon';
 
 // ---------- 工具函数 ----------
 
@@ -83,6 +86,9 @@ export default function LibraryView() {
   const playTrack = useStore((s) => s.playTrack);
   const setShowBatchTag = useStore((s) => s.setShowBatchTag);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
+  const setSelection = useStore((s) => s.setSelection);
+  const retainSelection = useStore((s) => s.retainSelection);
+  const trackBodyRef = useRef<HTMLDivElement>(null);
 
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; track: Track } | null>(null);
@@ -123,9 +129,18 @@ export default function LibraryView() {
 
   const visibleIds = useMemo(() => visibleTracks.map(t => t.id), [visibleTracks]);
   const nowPlayingId = currentTrack?.id ?? null;
+  const marqueeSelection = useMarqueeSelection({
+    containerRef: trackBodyRef,
+    selectedIds: selectedTrackIds,
+    setSelection,
+    clearSelection,
+  });
+
+  useEffect(() => retainSelection(visibleIds), [retainSelection, visibleIds]);
 
   // 行点击
   const handleRowClick = (e: React.MouseEvent, track: Track) => {
+    if (marqueeSelection.consumeSuppressedClick()) return;
     if (e.shiftKey && _lastSelectedId !== null) {
       selectRange(_lastSelectedId, track.id, visibleIds);
     } else if (e.ctrlKey || e.metaKey) {
@@ -157,7 +172,7 @@ export default function LibraryView() {
   const handleAddToPlaylist = async (pl: Playlist) => {
     setShowAddMenu(false);
     const ids = contextMenu
-      ? [contextMenu.track.id]
+      ? contextSelectionIds(contextMenu.track.id, selectedTrackIds)
       : [...selectedTrackIds];
     setContextMenu(null);
     try {
@@ -175,7 +190,7 @@ export default function LibraryView() {
   // 删除曲目
   const handleDelete = async (deleteFiles: boolean) => {
     const ids = contextMenu
-      ? [contextMenu.track.id]
+      ? contextSelectionIds(contextMenu.track.id, selectedTrackIds)
       : [...selectedTrackIds];
     setContextMenu(null);
 
@@ -229,13 +244,14 @@ export default function LibraryView() {
           <div className="library-toolbar-right">
             {/* 选中时显示操作按钮 */}
             {selectedTrackIds.size > 0 && (
-              <>
-                <button className="primary" onClick={() => setShowBatchTag(true)}>
-                  编辑标签 ({selectedTrackIds.size})
+              <div className="selection-actions" aria-label={`已选择 ${selectedTrackIds.size} 首`}>
+                <span className="selection-count">已选 {selectedTrackIds.size} 首</span>
+                <button className="compact-icon-btn primary" aria-label="编辑标签" title="编辑标签" onClick={() => setShowBatchTag(true)}>
+                  <Icon name="edit" />
                 </button>
                 <div className="add-menu-wrapper">
-                  <button className="primary" onClick={() => setShowAddMenu(!showAddMenu)}>
-                    添加到播放清单 ▾
+                  <button className="compact-icon-btn primary" aria-label="添加到播放清单" title="添加到播放清单" onClick={() => setShowAddMenu(!showAddMenu)}>
+                    <Icon name="playlist" />
                   </button>
                   {showAddMenu && (
                     <div className="add-menu glass-panel-strong" onClick={(e) => e.stopPropagation()}>
@@ -252,21 +268,23 @@ export default function LibraryView() {
                   )}
                 </div>
                 <button
-                  className="danger-btn"
+                  className="danger-btn compact-icon-btn"
+                  aria-label="从音乐库移除"
                   onClick={() => handleDelete(false)}
                   title="从音乐库移除（不删除文件）"
                 >
-                  移除
+                  <Icon name="remove" />
                 </button>
                 <button
-                  className="danger-btn"
+                  className="danger-btn compact-icon-btn"
+                  aria-label="删除本地文件"
                   onClick={() => handleDelete(true)}
                   title="删除文件（不可撤销）"
                 >
-                  删除文件
+                  <Icon name="trash" />
                 </button>
-                <button onClick={clearSelection}>取消选择</button>
-              </>
+                <button className="compact-icon-btn" aria-label="取消选择" title="取消选择" onClick={clearSelection}><Icon name="close" /></button>
+              </div>
             )}
           </div>
         </div>
@@ -286,7 +304,13 @@ export default function LibraryView() {
           </div>
 
           {/* 曲目行 */}
-          <div className="track-body" onClick={(e) => { if (e.target === e.currentTarget) clearSelection(); }}>
+          <div
+            ref={trackBodyRef}
+            className="track-body"
+            onMouseDown={marqueeSelection.onMouseDown}
+            onClick={(e) => { if (e.target === e.currentTarget && !marqueeSelection.consumeSuppressedClick()) clearSelection(); }}
+          >
+            {marqueeSelection.marquee && <div className="selection-marquee" style={marqueeSelection.marqueeStyle} aria-hidden="true" />}
             {visibleTracks.length === 0 ? (
               <div className="empty-state text-muted">
                 {tracks.length === 0 ? '点击左下角「＋ 添加文件夹」导入音乐' : '无匹配结果'}
@@ -298,9 +322,10 @@ export default function LibraryView() {
                 onClick={(e) => handleRowClick(e, track)}
                 onDoubleClick={() => handleDoubleClick(track)}
                 onContextMenu={(e) => handleContextMenu(e, track)}
+                data-track-id={track.id}
               >
                 <div className="track-cell col-resonance">
-                  <ResonanceMark
+                  <span data-selection-ignore><ResonanceMark
                     level={track.resonance}
                     onChange={(level) => {
                       setTrackResonance(track.id, level).catch((error) => {
@@ -308,7 +333,7 @@ export default function LibraryView() {
                         window.alert('评价保存失败，请重试');
                       });
                     }}
-                  />
+                  /></span>
                 </div>
                 <div className="track-cell col-title" title={trackDisplayTitle(track)}>
                   <span className="truncate">{trackDisplayTitle(track)}</span>

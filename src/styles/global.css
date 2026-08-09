@@ -237,6 +237,8 @@ input[type='range']::-webkit-slider-thumb:hover {
   display: flex;
   flex: 1;
   overflow: hidden;
+  gap: 10px;
+  padding: 10px;
 }
 
 .app-main {
@@ -244,17 +246,21 @@ input[type='range']::-webkit-slider-thumb:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .app-drawer {
-  width: 580px;
+  width: clamp(320px, 38vw, 520px);
   flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border);
-  border-radius: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
 }
 
 /* ============================================================
@@ -579,6 +585,36 @@ input[type='range']::-webkit-slider-thumb:hover {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  min-width: 0;
+}
+
+.selection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.selection-count {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.compact-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.ui-icon {
+  display: block;
+  pointer-events: none;
 }
 
 .library-sel-count {
@@ -704,6 +740,17 @@ input[type='range']::-webkit-slider-thumb:hover {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
+  position: relative;
+}
+
+.selection-marquee {
+  position: fixed;
+  z-index: 250;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(232, 154, 78, 0.08) inset;
 }
 
 .track-row {
@@ -1076,6 +1123,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   gap: 12px;
   padding: 16px 20px 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .playlist-title {
@@ -1108,6 +1156,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
+  position: relative;
 }
 
 .playlist-row {
@@ -1141,7 +1190,27 @@ input[type='range']::-webkit-slider-thumb:hover {
 .pl-cell-index {
   font-size: 12px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
+
+.playlist-drag-handle {
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+}
+
+.playlist-row:hover .playlist-drag-handle,
+.playlist-row.selected .playlist-drag-handle,
+.playlist-drag-handle:focus-visible {
+  opacity: 1;
+}
+
+.playlist-drag-handle:active { cursor: grabbing; }
 
 .pl-cell-resonance {
   display: flex;
@@ -1316,8 +1385,11 @@ input[type='range']::-webkit-slider-thumb:hover {
 /* ============================================================
    Liquid Memory 音频响应视觉
    ============================================================ */
-.app-main.immersive-active {
-  position: relative;
+.immersive-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
   background: #09090d;
 }
 
@@ -1341,6 +1413,37 @@ input[type='range']::-webkit-slider-thumb:hover {
   place-items: center;
   color: #fff;
   background: #08090d;
+}
+
+.liquid-player {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 44px));
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 34px 42px 34px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(12, 13, 19, 0.58);
+  backdrop-filter: blur(18px) saturate(130%);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+}
+
+.liquid-player input[type='range'] { width: 100%; }
+.liquid-player .liquid-play { color: #fff; background: rgba(255, 255, 255, 0.1); }
+
+@media (max-width: 900px) {
+  .app-body { gap: 7px; padding: 7px; }
+  .app-drawer { width: clamp(280px, 42vw, 380px); }
+  .selection-count { display: none; }
+  .playerbar-volume-slider { width: 54px; }
 }
 
 .liquid-cover-texture {

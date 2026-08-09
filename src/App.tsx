@@ -14,6 +14,7 @@ import EqPanel from './components/EqPanel';
 import LyricsPanel from './components/LyricsPanel';
 import BatchTagEditor from './components/BatchTagEditor';
 import ImmersiveVisualizer from './components/ImmersiveVisualizer';
+import AppShell from './components/AppShell';
 import { extractCoverPalette, fallbackPalette } from './visualizer/palette';
 import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPresentation';
 import { usePlaybackShortcuts } from './keyboard/usePlaybackShortcuts';
@@ -327,43 +328,8 @@ export default function App() {
     }
   };
 
-  return (
-    <>
-      {/* 标题栏 */}
-      <TitleBar />
-
-      {/* 主体三栏 */}
-      <div className="app-body">
-        <Sidebar />
-
-        <main className={`app-main ${immersiveMode ? 'immersive-active' : ''}`}>
-          {immersiveMode && currentTrack ? (
-            <ImmersiveVisualizer
-              trackKey={String(currentTrack.id)}
-              title={displayTitle}
-              lyric={immersiveLyrics.current}
-              nextLyric={immersiveLyrics.next}
-              coverArt={coverArt}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              duration={duration}
-              motionEnabled={reactiveMotionEnabled}
-              onExit={() => setImmersiveMode(false)}
-              onMotionChange={setReactiveMotionEnabled}
-            />
-          ) : view === 'playlist' ? <PlaylistView /> : <LibraryView />}
-        </main>
-
-        {/* 浮层面板（EQ 或歌词） */}
-        {(showEq || showLyrics) && (
-          <aside className="app-drawer">
-            {showEq ? <EqPanel /> : <LyricsPanel />}
-          </aside>
-        )}
-      </div>
-
-      {/* 底部播放控制栏 */}
-      <PlayerBar
+  const player = (
+    <PlayerBar
         isPlaying={isPlaying}
         currentTime={currentTime}
         duration={duration}
@@ -385,9 +351,10 @@ export default function App() {
         onToggleEq={toggleEq}
         onToggleImmersive={() => setImmersiveMode(!immersiveMode)}
         onCyclePlayMode={cyclePlayMode}
-      />
-
-      {/* 批量标签编辑器 */}
+    />
+  );
+  const overlays = (
+    <>
       {showBatchTag && selectedTrackIds.size > 0 && (
         <BatchTagEditor
           onClose={() => setShowBatchTag(false)}
@@ -395,5 +362,37 @@ export default function App() {
         />
       )}
     </>
+  );
+
+  return (
+    <AppShell
+      immersive={immersiveMode}
+      titleBar={<TitleBar />}
+      sidebar={<Sidebar />}
+      main={<main className="app-main">{view === 'playlist' ? <PlaylistView /> : <LibraryView />}</main>}
+      drawer={(showEq || showLyrics) ? <aside className="app-drawer">{showEq ? <EqPanel /> : <LyricsPanel />}</aside> : null}
+      player={player}
+      immersiveContent={(
+        <ImmersiveVisualizer
+          trackKey={String(currentTrack?.id ?? 'empty')}
+          title={currentTrack ? displayTitle : '未播放'}
+          lyric={immersiveLyrics.current}
+          nextLyric={immersiveLyrics.next}
+          coverArt={coverArt}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          motionEnabled={reactiveMotionEnabled}
+          onExit={() => setImmersiveMode(false)}
+          onMotionChange={setReactiveMotionEnabled}
+          onTogglePlay={handleTogglePlay}
+          onNext={handleNext}
+          onPrev={handlePrev}
+          onSeek={handleSeek}
+          hasTrack={currentTrack !== null}
+        />
+      )}
+      overlays={overlays}
+    />
   );
 }

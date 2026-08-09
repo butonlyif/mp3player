@@ -36,6 +36,9 @@ describe('PlayerBar immersive control', () => {
     expect(screen.getByRole('button', { name: '歌词' })).toHaveAttribute('aria-keyshortcuts', 'L');
     expect(screen.getByRole('button', { name: '均衡器' })).toHaveAttribute('title', '均衡器（E）');
     expect(screen.getByRole('button', { name: '进入沉浸模式' })).toHaveAttribute('title', '进入沉浸模式（I）');
+    expect(screen.getByRole('button', { name: '歌词' })).toHaveClass('compact-icon-btn');
+    expect(screen.getByRole('button', { name: '均衡器' })).toHaveClass('compact-icon-btn');
+    expect(screen.getByRole('button', { name: '进入沉浸模式' })).toHaveClass('compact-icon-btn');
   });
 
   it('enters immersive mode without changing playback controls', () => {

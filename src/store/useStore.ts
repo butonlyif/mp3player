@@ -74,6 +74,8 @@ interface AppState {
   // ===== Actions: 选择 =====
   selectTrack: (id: number, additive: boolean) => void;
   selectRange: (fromId: number, toId: number, allIds: number[]) => void;
+  setSelection: (ids: Iterable<number>, anchorId?: number | null) => void;
+  retainSelection: (ids: Iterable<number>) => void;
   clearSelection: () => void;
 
   // ===== Actions: 播放清单 =====
@@ -268,6 +270,23 @@ export const useStore = create<AppState>((set, get) => ({
         newSet.add(allIds[i]);
       }
       return { selectedTrackIds: newSet, _lastSelectedId: toId };
+    }),
+
+  setSelection: (ids, anchorId = null) =>
+    set({ selectedTrackIds: new Set(ids), _lastSelectedId: anchorId }),
+
+  retainSelection: (ids) =>
+    set((state) => {
+      const allowed = new Set(ids);
+      const selectedTrackIds = new Set(
+        [...state.selectedTrackIds].filter((id) => allowed.has(id)),
+      );
+      return {
+        selectedTrackIds,
+        _lastSelectedId: state._lastSelectedId !== null && allowed.has(state._lastSelectedId)
+          ? state._lastSelectedId
+          : null,
+      };
     }),
 
   clearSelection: () =>

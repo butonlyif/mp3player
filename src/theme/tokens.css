@@ -25,16 +25,16 @@
   --lyric-idle: rgba(158, 152, 144, 0.45);
 
   /* 圆角 */
-  --radius: 8px;
-  --radius-sm: 6px;
-  --radius-xs: 4px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 7px;
 
   /* 阴影 */
   --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 6px 28px rgba(0, 0, 0, 0.45);
 
   /* 字体 */
-  --font: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
 
   /* 尺寸 */
   --titlebar-h: 38px;

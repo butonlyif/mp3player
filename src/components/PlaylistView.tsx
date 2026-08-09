@@ -1,10 +1,13 @@
 // ===== 播放清单视图 =====
-import { useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../lib/api';
 import type { Track } from '../lib/api';
 import { sortByResonanceStable, trackDisplayTitle } from '../library/resonance';
 import ResonanceMark from './ResonanceMark';
+import { useMarqueeSelection } from '../selection/useMarqueeSelection';
+import { contextSelectionIds } from '../selection/selectionModel';
+import Icon from './Icon';
 
 /** 格式化时长 */
 function formatDuration(sec: number): string {
@@ -34,6 +37,15 @@ export default function PlaylistView() {
   const sortOrder = useStore((s) => s.sortOrder);
   const setSortBy = useStore((s) => s.setSortBy);
   const setTrackResonance = useStore((s) => s.setTrackResonance);
+  const selectedTrackIds = useStore((s) => s.selectedTrackIds);
+  const lastSelectedId = useStore((s) => s._lastSelectedId);
+  const selectTrack = useStore((s) => s.selectTrack);
+  const selectRange = useStore((s) => s.selectRange);
+  const setSelection = useStore((s) => s.setSelection);
+  const retainSelection = useStore((s) => s.retainSelection);
+  const clearSelection = useStore((s) => s.clearSelection);
+  const refreshLibrary = useStore((s) => s.refreshLibrary);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -56,6 +68,16 @@ export default function PlaylistView() {
       : playlistTracks,
     [playlistTracks, sortBy, sortOrder],
   );
+  const visibleIds = useMemo(() => visiblePlaylistTracks.map((track) => track.id), [visiblePlaylistTracks]);
+  const marqueeSelection = useMarqueeSelection({ containerRef: bodyRef, selectedIds: selectedTrackIds, setSelection, clearSelection });
+
+  useEffect(() => retainSelection(visibleIds), [retainSelection, visibleIds]);
+
+  const handleRowClick = (event: React.MouseEvent, trackId: number) => {
+    if (marqueeSelection.consumeSuppressedClick()) return;
+    if (event.shiftKey && lastSelectedId !== null) selectRange(lastSelectedId, trackId, visibleIds);
+    else selectTrack(trackId, event.ctrlKey || event.metaKey);
+  };
 
   // 双击播放
   const handleDoubleClick = (track: Track) => {
@@ -74,11 +96,29 @@ export default function PlaylistView() {
     setContextMenu(null);
     if (currentPlaylistId === null) return;
     try {
-      await api.playlist.removeTracks(currentPlaylistId, [trackId]);
+      const ids = contextSelectionIds(trackId, selectedTrackIds);
+      await api.playlist.removeTracks(currentPlaylistId, ids);
       const updated = await api.playlist.getTracks(currentPlaylistId);
       setPlaylistTracks(updated);
     } catch (e) {
       console.error('移除曲目失败:', e);
+    }
+  };
+
+  const handleLibraryDelete = async (deleteFiles: boolean) => {
+    const ids = [...selectedTrackIds];
+    if (ids.length === 0 || currentPlaylistId === null) return;
+    const message = deleteFiles
+      ? `确定删除 ${ids.length} 个本地文件吗？此操作不可恢复。`
+      : `确定从音乐库移除 ${ids.length} 首歌曲吗？本地文件会保留。`;
+    if (!window.confirm(message)) return;
+    try {
+      await api.library.deleteTracks(ids, deleteFiles);
+      await refreshLibrary();
+      setPlaylistTracks(await api.playlist.getTracks(currentPlaylistId));
+      clearSelection();
+    } catch (error) {
+      console.error(deleteFiles ? '删除本地文件失败:' : '从音乐库移除失败:', error);
     }
   };
 
@@ -145,10 +185,35 @@ export default function PlaylistView() {
         >
           共鸣{sortBy === 'resonance' ? (sortOrder === 'desc' ? ' ▼' : ' ▲') : ''}
         </button>
+        {selectedTrackIds.size > 0 && (
+          <div className="selection-actions" aria-label={`已选择 ${selectedTrackIds.size} 首`}>
+            <span className="selection-count">已选 {selectedTrackIds.size} 首</span>
+            <button
+              className="danger-btn compact-icon-btn"
+              aria-label="从播放列表移除"
+              title="从播放列表移除"
+              onClick={() => handleRemove([...selectedTrackIds][0])}
+            ><Icon name="remove" /></button>
+            <button
+              className="danger-btn compact-icon-btn"
+              aria-label="从音乐库移除"
+              title="从音乐库移除（保留本地文件）"
+              onClick={() => handleLibraryDelete(false)}
+            ><Icon name="playlist" /></button>
+            <button
+              className="danger-btn compact-icon-btn"
+              aria-label="删除本地文件"
+              title="删除本地文件（不可恢复）"
+              onClick={() => handleLibraryDelete(true)}
+            ><Icon name="trash" /></button>
+            <button className="compact-icon-btn" aria-label="取消选择" title="取消选择" onClick={clearSelection}><Icon name="close" /></button>
+          </div>
+        )}
       </div>
 
       {/* 曲目列表 */}
-      <div className="playlist-body">
+      <div ref={bodyRef} className="playlist-body" onMouseDown={marqueeSelection.onMouseDown}>
+        {marqueeSelection.marquee && <div className="selection-marquee" style={marqueeSelection.marqueeStyle} aria-hidden="true" />}
         {playlistTracks.length === 0 ? (
           <div className="playlist-empty text-muted">
             播放清单为空，从音乐库添加曲目
@@ -159,23 +224,36 @@ export default function PlaylistView() {
               key={track.id}
               className={`playlist-row list-row ${
                 nowPlayingId === track.id ? 'playing' : ''
+              } ${selectedTrackIds.has(track.id) ? 'selected' : ''
               } ${dragIndex === index ? 'dragging' : ''} ${
                 dragOverIndex === index && dragIndex !== null ? 'drag-over' : ''
               }`}
-              draggable={sortBy !== 'resonance'}
-              onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
               onDoubleClick={() => handleDoubleClick(track)}
+              onClick={(event) => handleRowClick(event, track.id)}
               onContextMenu={(e) => handleContextMenu(e, track.id)}
+              data-track-id={track.id}
             >
-              <div className="pl-cell pl-cell-index text-muted">{index + 1}</div>
+              <div className="pl-cell pl-cell-index text-muted">
+                <button
+                  type="button"
+                  className="playlist-drag-handle"
+                  aria-label="拖动排序"
+                  draggable={sortBy !== 'resonance'}
+                  disabled={sortBy === 'resonance'}
+                  data-selection-ignore
+                  onDragStart={() => handleDragStart(index)}
+                  onDragEnd={handleDragEnd}
+                ><Icon name="grip" /></button>
+                <span>{index + 1}</span>
+              </div>
               <div className="pl-cell pl-cell-resonance">
-                <ResonanceMark
+                <span data-selection-ignore><ResonanceMark
                   level={track.resonance}
                   onChange={(level) => setTrackResonance(track.id, level).catch(() => window.alert('评价保存失败，请重试'))}
-                />
+                /></span>
               </div>
               <div className="pl-cell pl-cell-title truncate" title={trackDisplayTitle(track)}>
                 {trackDisplayTitle(track)}

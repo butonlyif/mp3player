@@ -165,7 +165,7 @@ export default function PlayerBar(props: PlayerBarProps) {
       {/* 右侧：歌词 + EQ + 音量 */}
       <div className="playerbar-right">
         <button
-          className={`icon-btn ${lyricsActive ? 'active' : ''}`}
+          className={`icon-btn compact-icon-btn ${lyricsActive ? 'active' : ''}`}
           title="歌词（L）"
           aria-label="歌词"
           aria-keyshortcuts="L"
@@ -176,7 +176,7 @@ export default function PlayerBar(props: PlayerBarProps) {
           </svg>
         </button>
         <button
-          className={`icon-btn ${eqActive ? 'active' : ''}`}
+          className={`icon-btn compact-icon-btn ${eqActive ? 'active' : ''}`}
           title="均衡器（E）"
           aria-label="均衡器"
           aria-keyshortcuts="E"
@@ -191,7 +191,7 @@ export default function PlayerBar(props: PlayerBarProps) {
           </svg>
         </button>
         <button
-          className={`icon-btn ${immersiveActive ? 'active' : ''}`}
+          className={`icon-btn compact-icon-btn ${immersiveActive ? 'active' : ''}`}
           title={`${immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}（I）`}
           aria-label={immersiveActive ? '退出沉浸模式' : '进入沉浸模式'}
           aria-keyshortcuts="I"

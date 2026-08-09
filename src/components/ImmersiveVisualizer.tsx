@@ -18,12 +18,18 @@ interface ImmersiveVisualizerProps {
   motionEnabled: boolean;
   onExit: () => void;
   onMotionChange: (enabled: boolean) => void;
+  onTogglePlay?: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
+  onSeek?: (time: number) => void;
+  hasTrack?: boolean;
 }
 
 type VisualStyle = CSSProperties & Record<`--liquid-${string}`, string>;
 
 export default function ImmersiveVisualizer({
   trackKey, title, lyric, nextLyric, coverArt, isPlaying, currentTime, duration, motionEnabled, onExit, onMotionChange,
+  onTogglePlay, onNext, onPrev, onSeek, hasTrack = true,
 }: ImmersiveVisualizerProps) {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -211,6 +217,13 @@ export default function ImmersiveVisualizer({
         <h1>{stripAudioExtension(title)}</h1>
         {lyric && <p key={lyric} className="liquid-lyric">{lyric}</p>}
         {nextLyric && <p key={nextLyric} className="liquid-next-lyric">{nextLyric}</p>}
+      </div>
+      <div className="liquid-player" aria-label="沉浸播放控制">
+        <button className="icon-btn" aria-label="上一首" disabled={!hasTrack} onClick={onPrev}>‹</button>
+        <button className="icon-btn liquid-play" aria-label={isPlaying ? '暂停' : '播放'} disabled={!hasTrack} onClick={onTogglePlay}>{isPlaying ? 'Ⅱ' : '▶'}</button>
+        <button className="icon-btn" aria-label="下一首" disabled={!hasTrack} onClick={onNext}>›</button>
+        <input aria-label="播放进度" type="range" min={0} max={duration || 0} step={0.1} value={Math.min(currentTime, duration)} disabled={!hasTrack} onChange={(event) => onSeek?.(Number(event.target.value))} />
+        <span>{Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')} / {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}</span>
       </div>
     </section>
   );

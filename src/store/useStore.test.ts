@@ -40,6 +40,26 @@ describe('visualizer UI state', () => {
   });
 });
 
+describe('desktop selection state', () => {
+  it('replaces selection atomically and records its range anchor', () => {
+    useStore.setState({ selectedTrackIds: new Set([1]), _lastSelectedId: 1 });
+
+    useStore.getState().setSelection([2, 3], 2);
+
+    expect([...useStore.getState().selectedTrackIds]).toEqual([2, 3]);
+    expect(useStore.getState()._lastSelectedId).toBe(2);
+  });
+
+  it('drops hidden selections and clears a hidden range anchor', () => {
+    useStore.setState({ selectedTrackIds: new Set([2, 3]), _lastSelectedId: 2 });
+
+    useStore.getState().retainSelection([3, 4]);
+
+    expect([...useStore.getState().selectedTrackIds]).toEqual([3]);
+    expect(useStore.getState()._lastSelectedId).toBeNull();
+  });
+});
+
 describe('track resonance state', () => {
   it('updates every reference immediately and persists it', async () => {
     let finish!: () => void;
