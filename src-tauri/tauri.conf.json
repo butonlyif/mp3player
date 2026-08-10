@@ -21,6 +21,19 @@
         "minWidth": 800,
         "minHeight": 500,
         "decorations": false
+      },
+      {
+        "label": "magic-pill",
+        "title": "Soul Play Magic Pill",
+        "width": 88,
+        "height": 88,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

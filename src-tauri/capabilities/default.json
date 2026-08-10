@@ -26,7 +26,7 @@
     "core:window:allow-current-monitor",
     "core:window:allow-primary-monitor",
     "core:webview:allow-create-webview-window",
-    "core:webview:allow-webview-by-label",
+    "core:webview:allow-get-all-webviews",
     "dialog:allow-open",
     "fs:allow-read-file",
     "fs:allow-read-dir",

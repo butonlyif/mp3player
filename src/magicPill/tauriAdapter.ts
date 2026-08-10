@@ -1,5 +1,6 @@
 import { emitTo, TauriEvent } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { LogicalPosition, LogicalSize } from '@tauri-apps/api/dpi';
 import { currentMonitor, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
 import type { MagicPillPlatform } from './controller';
 import { COLLAPSED_SIZE, firstPillPosition, pillPositionForState, type Point, type Rect } from './geometry';
@@ -40,6 +41,9 @@ export interface PillWindowLike {
   show(): Promise<void>;
   setFocus(): Promise<void>;
   close(): Promise<void>;
+  hide(): Promise<void>;
+  setPosition(position: Point): Promise<void>;
+  setSize(size: { width: number; height: number }): Promise<void>;
   listen(event: string, handler: (event: WindowEvent<unknown>) => void): Promise<() => void>;
   onMoved(handler: (event: WindowEvent<{ x: number; y: number }>) => void): Promise<() => void>;
   scaleFactor(): Promise<number>;
@@ -89,12 +93,36 @@ async function defaultWorkArea(): Promise<Rect> {
   return { x: position.x, y: position.y, width: size.width, height: size.height };
 }
 
+function adaptWebviewWindow(wv: WebviewWindow): PillWindowLike {
+  return {
+    show: () => wv.show(),
+    setFocus: () => wv.setFocus(),
+    close: () => wv.close(),
+    hide: () => wv.hide(),
+    setPosition: (position) => wv.setPosition(new LogicalPosition(position.x, position.y)),
+    setSize: (size) => wv.setSize(new LogicalSize(size.width, size.height)),
+    listen: (event, handler) => wv.listen(event, handler as (event: { payload: unknown }) => void),
+    onMoved: (handler) => wv.onMoved(({ payload }) => handler({ payload: { x: payload.x, y: payload.y } })),
+    scaleFactor: () => wv.scaleFactor(),
+    innerSize: async () => {
+      const s = await wv.innerSize();
+      return { width: s.width, height: s.height };
+    },
+  };
+}
+
 function defaultDependencies(): TauriMagicPillDependencies {
   const mainWindow = getCurrentWindow();
   return {
     storage: window.localStorage,
-    getExistingPill: () => WebviewWindow.getByLabel('magic-pill'),
-    createPill: (label, options) => new WebviewWindow(label, options),
+    getExistingPill: async () => {
+      const wv = await WebviewWindow.getByLabel('magic-pill');
+      return wv ? adaptWebviewWindow(wv) : null;
+    },
+    createPill: (label, options) => {
+      const wv = new WebviewWindow(label, options);
+      return adaptWebviewWindow(wv);
+    },
     getWorkArea: defaultWorkArea,
     mainWindow,
     emitTo,
@@ -133,6 +161,16 @@ export function createTauriMagicPillPlatform(
     });
   };
 
+  const resetCollapsedPosition = async (target: PillWindowLike) => {
+    const area = await dependencies.getWorkArea();
+    const saved = loadSavedPillPosition(dependencies.storage);
+    const position = saved
+      ? pillPositionForState(saved, area, false)
+      : firstPillPosition(area);
+    await target.setPosition(position);
+    await target.setSize(COLLAPSED_SIZE);
+  };
+
   return {
     async createOrFocusPill() {
       const existing = await dependencies.getExistingPill();
@@ -140,6 +178,7 @@ export function createTauriMagicPillPlatform(
         pill = existing;
         readyPromise = Promise.resolve();
         await trackCollapsedPosition(existing);
+        await resetCollapsedPosition(existing);
         await existing.show();
         await existing.setFocus();
         return;
@@ -203,7 +242,7 @@ export function createTauriMagicPillPlatform(
 
     async closePill() {
       const target = await findPill();
-      await target?.close();
+      await target?.hide();
       pill = null;
       trackedPill = null;
     },

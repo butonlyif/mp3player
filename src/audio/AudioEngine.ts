@@ -249,18 +249,38 @@ export class AudioEngine {
     const durationMs = Math.max(0.2, seconds) * 1000;
     const startedAt = performance.now();
     await new Promise<void>((resolve) => {
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener('visibilitychange', onHidden);
+        resolve();
+      };
+      const onHidden = () => {
+        if (!document.hidden) return;
+        previous.volume = 0;
+        next.volume = 1;
+        finish();
+      };
       const ramp = (now: number) => {
         if (generation !== this.crossfadeGeneration) {
-          resolve();
+          finish();
           return;
         }
         const progress = Math.min(1, (now - startedAt) / durationMs);
         previous.volume = Math.cos(progress * Math.PI * 0.5);
         next.volume = Math.sin(progress * Math.PI * 0.5);
         if (progress < 1) requestAnimationFrame(ramp);
-        else resolve();
+        else finish();
       };
-      requestAnimationFrame(ramp);
+      document.addEventListener('visibilitychange', onHidden);
+      if (document.hidden) {
+        previous.volume = 0;
+        next.volume = 1;
+        finish();
+      } else {
+        requestAnimationFrame(ramp);
+      }
     });
 
     if (generation !== this.crossfadeGeneration) {
