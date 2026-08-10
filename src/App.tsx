@@ -1,5 +1,5 @@
 // ===== 主布局组件 =====
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store/useStore';
 import { api } from './lib/api';
 import { audioEngine } from './audio/AudioEngine';
@@ -20,6 +20,10 @@ import { getImmersiveLyrics, stripAudioExtension } from './visualizer/trackPrese
 import { usePlaybackShortcuts } from './keyboard/usePlaybackShortcuts';
 import { usePlaybackMemory } from './listening/usePlaybackMemory';
 import { adaptiveCrossfadeSeconds } from './audio/continuousListening';
+import { tuneMagicPillPalette } from './magicPill/palette';
+import { createMagicPillController } from './magicPill/controller';
+import { createTauriMagicPillPlatform } from './magicPill/tauriAdapter';
+import { useMagicPillBridge } from './magicPill/useMagicPillBridge';
 
 export default function App() {
   // ===== 播放状态 =====
@@ -48,6 +52,13 @@ export default function App() {
   const playQueueIndex = useStore((s) => s.playQueueIndex);
   const pendingCrossfade = useRef<number | null>(null);
   const automaticTransitionTrack = useRef<number | null>(null);
+  const [magicPillPalette, setMagicPillPalette] = useState<[string, string, string]>(() =>
+    tuneMagicPillPalette(fallbackPalette(String(currentTrackId ?? 'peter-player'))).colors,
+  );
+  const magicPillController = useMemo(
+    () => createMagicPillController(createTauriMagicPillPlatform()),
+    [],
+  );
 
   // ===== Actions =====
   const setTracks = useStore((s) => s.setTracks);
@@ -73,13 +84,19 @@ export default function App() {
   // 日常模式只更新根节点 CSS 变量，不触发 React 高频渲染。
   useEffect(() => {
     const root = document.documentElement;
-    const palette = fallbackPalette(String(currentTrackId ?? 'peter-player'));
-    root.style.setProperty('--ambient-color', palette.colors[0]);
+    const fallback = tuneMagicPillPalette(
+      fallbackPalette(String(currentTrackId ?? 'peter-player')),
+    );
+    setMagicPillPalette(fallback.colors);
+    root.style.setProperty('--ambient-color', fallback.colors[0]);
     if (!coverArt) return;
     let current = true;
     extractCoverPalette(coverArt, String(currentTrackId))
       .then((result) => {
-        if (current) root.style.setProperty('--ambient-color', result.colors[0]);
+        if (!current) return;
+        const tuned = tuneMagicPillPalette(result);
+        setMagicPillPalette(tuned.colors);
+        root.style.setProperty('--ambient-color', tuned.colors[0]);
       })
       .catch(() => undefined);
     return () => { current = false; };
@@ -273,6 +290,20 @@ export default function App() {
     if (crossfadeEnabled && isPlaying) pendingCrossfade.current = 0.5;
     playPrev();
   };
+
+  useMagicPillBridge({
+    controller: magicPillController,
+    trackId: currentTrackId,
+    title: displayTitle,
+    artist: currentTrack?.artist ?? '',
+    isPlaying,
+    palette: magicPillPalette,
+    actions: {
+      previous: handlePrev,
+      togglePlayback: handleTogglePlay,
+      next: handleNext,
+    },
+  });
 
   usePlaybackShortcuts({
     hasTrack: currentTrack !== null,
