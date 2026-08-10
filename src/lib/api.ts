@@ -37,6 +37,11 @@ export interface Playlist {
   updated_at: number;
 }
 
+export interface WatchFolder {
+  id: number;
+  path: string;
+}
+
 /** 曲目的完整标签（含歌词、封面） */
 export interface TrackTags {
   title: string | null;
@@ -110,9 +115,20 @@ export const api = {
     /** 添加监控文件夹（后端弹出系统目录选择对话框），然后刷新库 */
     addFolder: () => invoke<void>('library_add_folder'),
 
+    /** 获取监控文件夹列表 */
+    listFolders: () => invoke<WatchFolder[]>('library_list_folders'),
+
+    /** 移除监控文件夹（同时从库中删除该目录下的曲目） */
+    removeFolder: (folderId: number) =>
+      invoke<void>('library_remove_folder', { folderId }),
+
     /** 扫描指定文件夹 */
     scan: (folderId: number) =>
       invoke<{ scanned: number }>('library_scan', { folderId }),
+
+    /** 扫描所有监控文件夹 */
+    scanAll: () =>
+      invoke<number>('library_scan_all'),
 
     /** 查询曲目列表 */
     query: (opts: QueryOpts) =>

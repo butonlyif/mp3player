@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useStore, type LibraryMode } from '../store/useStore';
 import { api } from '../lib/api';
-import type { Playlist } from '../lib/api';
+import type { Playlist, WatchFolder } from '../lib/api';
 
 export default function Sidebar() {
   // 状态
@@ -30,6 +30,8 @@ export default function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null);
   const [renaming, setRenaming] = useState<Playlist | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [folders, setFolders] = useState<WatchFolder[]>([]);
+  const [showFolders, setShowFolders] = useState(false);
   const memoryRequest = useRef(0);
 
   // 监听扫描进度事件
@@ -54,6 +56,21 @@ export default function Sidebar() {
     };
   }, []);
 
+  // 加载文件夹列表
+  const refreshFolders = useCallback(async () => {
+    try {
+      const list = await api.library.listFolders();
+      setFolders(list);
+    } catch (e) {
+      console.error('加载文件夹列表失败:', e);
+    }
+  }, []);
+
+  // 启动时加载文件夹列表
+  useEffect(() => {
+    refreshFolders();
+  }, [refreshFolders]);
+
   // 点击空白处关闭右键菜单
   useEffect(() => {
     if (!contextMenu) return;
@@ -77,14 +94,24 @@ export default function Sidebar() {
     setBusy(true);
     setScanInfo('等待选择文件夹…');
     try {
-      // addFolder 返回后扫描在后台进行，UI 不阻塞
       await api.library.addFolder();
-      // 扫描完成由 scan:done 事件处理，此处仅标记对话框已关闭
+      await refreshFolders();
     } catch (e) {
       console.error('添加文件夹失败:', e);
       setScanInfo(null);
     }
     setBusy(false);
+  };
+
+  // 移除文件夹
+  const handleRemoveFolder = async (folderId: number) => {
+    try {
+      await api.library.removeFolder(folderId);
+      await refreshFolders();
+      await refreshLibrary();
+    } catch (e) {
+      console.error('移除文件夹失败:', e);
+    }
   };
 
   // 选择播放清单
@@ -300,6 +327,37 @@ export default function Sidebar() {
         <button className="sidebar-action-btn" onClick={handleAddFolder} disabled={busy}>
           {busy ? '处理中…' : '＋ 添加文件夹'}
         </button>
+        <button
+          className="sidebar-action-btn"
+          onClick={() => {
+            const next = !showFolders;
+            setShowFolders(next);
+            if (next) refreshFolders();
+          }}
+        >
+          {showFolders ? '▲ 收起文件夹' : '▼ 管理文件夹'}
+        </button>
+        {showFolders && (
+          <div className="sidebar-folder-list">
+            {folders.length === 0 && (
+              <div className="sidebar-folder-empty text-muted">暂无监控文件夹</div>
+            )}
+            {folders.map((f) => (
+              <div key={f.id} className="sidebar-folder-item">
+                <span className="sidebar-folder-path truncate" title={f.path}>
+                  {f.path.split(/[/\\]/).pop() || f.path}
+                </span>
+                <button
+                  className="sidebar-folder-remove"
+                  title="移除"
+                  onClick={() => handleRemoveFolder(f.id)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 右键菜单 */}

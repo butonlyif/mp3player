@@ -139,6 +139,8 @@ pub fn run() {
         })
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
+            // 确保数据目录存在
+            std::fs::create_dir_all(&app_data)?;
             let conn = db::init_db(&app_data)?;
             app.manage(Arc::new(Mutex::new(conn)));
 
@@ -148,6 +150,9 @@ pub fn run() {
             // 音乐库
             commands::library_add_folder,
             commands::library_scan,
+            commands::library_scan_all,
+            commands::library_list_folders,
+            commands::library_remove_folder,
             commands::library_query,
             commands::library_update_resonance,
             commands::library_get_lyrics,
@@ -174,5 +179,8 @@ pub fn run() {
             commands::eq_save_preset,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            eprintln!("Fatal error running application: {e}");
+            std::process::exit(1);
+        });
 }

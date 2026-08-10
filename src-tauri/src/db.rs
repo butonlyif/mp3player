@@ -205,6 +205,11 @@ pub fn init_db(app_data_dir: &std::path::Path) -> rusqlite::Result<Connection> {
             path  TEXT UNIQUE NOT NULL
         );
 
+        -- 用户手动从库中移除（不删文件）的路径黑名单
+        CREATE TABLE IF NOT EXISTS excluded_paths (
+            path  TEXT PRIMARY KEY NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS eq_presets (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             name   TEXT UNIQUE NOT NULL,
@@ -526,6 +531,30 @@ pub fn delete_tracks_by_ids(conn: &Connection, ids: &[i64]) -> rusqlite::Result<
     Ok(removed)
 }
 
+/// 将路径加入排除黑名单（用户手动移除但不删文件）
+pub fn add_excluded_paths(conn: &Connection, paths: &[String]) -> rusqlite::Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    {
+        let mut stmt = tx.prepare("INSERT OR IGNORE INTO excluded_paths (path) VALUES (?1)")?;
+        for p in paths {
+            let _ = stmt.execute(params![p]);
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// 获取排除黑名单
+pub fn get_excluded_paths(conn: &Connection) -> rusqlite::Result<std::collections::HashSet<String>> {
+    let mut stmt = conn.prepare("SELECT path FROM excluded_paths")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut set = std::collections::HashSet::new();
+    for r in rows {
+        set.insert(r?);
+    }
+    Ok(set)
+}
+
 /// 删除路径不在 existing_paths 中的曲目
 pub fn delete_missing_tracks(
     conn: &Connection,
@@ -609,6 +638,12 @@ pub fn get_watch_folders(conn: &Connection) -> rusqlite::Result<Vec<WatchFolder>
         out.push(r?);
     }
     Ok(out)
+}
+
+/// 删除监控文件夹记录
+pub fn remove_watch_folder(conn: &Connection, id: i64) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM watch_folders WHERE id = ?", params![id])?;
+    Ok(())
 }
 
 // ---------- Playlist DAO ----------

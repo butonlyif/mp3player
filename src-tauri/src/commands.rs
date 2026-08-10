@@ -1,5 +1,5 @@
 // ===== Tauri 命令层：所有 #[tauri::command] 函数 =====
-use crate::db::{self, BatchTagError, BatchTagResult, BatchTagUpdate, EqPreset};
+use crate::db::{self, BatchTagError, BatchTagResult, BatchTagUpdate, EqPreset, WatchFolder};
 use crate::metadata::{self, ParsedLyrics};
 use crate::scanner;
 use lofty::config::WriteOptions;
@@ -39,6 +39,9 @@ fn sync_folder(conn: &Connection, root: &str, app: &AppHandle) -> rusqlite::Resu
     let files = scanner::walk_audio_files(root_path);
     let total = files.len();
 
+    // 获取用户手动移除的黑名单路径，扫描时跳过
+    let excluded = db::get_excluded_paths(conn).unwrap_or_default();
+
     let existing: HashMap<String, Option<i64>> =
         db::get_all_track_path_mtime(conn)?.into_iter().collect();
 
@@ -46,6 +49,10 @@ fn sync_folder(conn: &Connection, root: &str, app: &AppHandle) -> rusqlite::Resu
     let mut present: HashSet<String> = HashSet::new();
     for (path, mtime) in &files {
         let ps = path.to_string_lossy().to_string();
+        // 跳过黑名单路径
+        if excluded.contains(&ps) {
+            continue;
+        }
         present.insert(ps.clone());
         let need = match existing.get(&ps) {
             Some(Some(prev)) => *prev != *mtime,
@@ -61,11 +68,12 @@ fn sync_folder(conn: &Connection, root: &str, app: &AppHandle) -> rusqlite::Resu
     db::insert_tracks(conn, &to_upsert)?;
 
     // 仅清理位于本目录下、本次未出现的文件（不影响其他监控目录）
-    let root_norm = ensure_trailing_sep(root);
+    // 使用 Path API 进行跨平台路径前缀比较
+    let root_path = Path::new(root);
     let all = db::get_all_track_paths(conn)?;
     let to_delete: Vec<i64> = all
         .iter()
-        .filter(|(_, p)| p.starts_with(&root_norm))
+        .filter(|(_, p)| Path::new(p).starts_with(root_path))
         .filter(|(_, p)| !present.contains(p.as_str()))
         .map(|(id, _)| *id)
         .collect();
@@ -78,10 +86,11 @@ fn sync_folder(conn: &Connection, root: &str, app: &AppHandle) -> rusqlite::Resu
 }
 
 fn ensure_trailing_sep(p: &str) -> String {
-    if p.ends_with('/') {
+    let sep = std::path::MAIN_SEPARATOR;
+    if p.ends_with(sep) {
         p.to_string()
     } else {
-        format!("{p}/")
+        format!("{p}{sep}")
     }
 }
 
@@ -147,6 +156,69 @@ pub fn library_scan(
     Ok(ScanResult {
         scanned: scanned as i64,
     })
+}
+
+/// 扫描所有监控文件夹（启动时自动调用，后台线程执行避免阻塞）
+#[tauri::command]
+pub async fn library_scan_all(
+    app: AppHandle,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<i64, String> {
+    let db_conn = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let conn = match db_conn.lock() {
+            Ok(g) => g,
+            Err(_) => return Err("db lock poisoned".to_string()),
+        };
+        let folders = db::get_watch_folders(&conn).map_err(|e| e.to_string())?;
+        let mut total = 0i64;
+        for folder in &folders {
+            let n = sync_folder(&conn, &folder.path, &app).map_err(|e| e.to_string())?;
+            total += n as i64;
+        }
+        Ok(total)
+    })
+    .await
+    .map_err(|e| format!("scan task failed: {e}"))?;
+
+    result.map_err(|e| e)
+}
+
+/// 查询监控文件夹列表
+#[tauri::command]
+pub fn library_list_folders(
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<Vec<WatchFolder>, String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    db::get_watch_folders(&conn).map_err(|e| e.to_string())
+}
+
+/// 移除监控文件夹（同时删除该目录下的所有曲目，不删物理文件）
+#[tauri::command]
+pub fn library_remove_folder(
+    folder_id: i64,
+    state: State<'_, Arc<Mutex<Connection>>>,
+) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+
+    let folder = db::get_watch_folder(&conn, folder_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("监控文件夹 {folder_id} 不存在"))?;
+
+    // 删除该目录下的所有曲目记录（不删物理文件）
+    let root_path = Path::new(&folder.path);
+    let all = db::get_all_track_paths(&conn).map_err(|e| e.to_string())?;
+    let to_delete: Vec<i64> = all
+        .iter()
+        .filter(|(_, p)| Path::new(p).starts_with(root_path))
+        .map(|(id, _)| *id)
+        .collect();
+    db::delete_tracks_by_ids(&conn, &to_delete).map_err(|e| e.to_string())?;
+
+    // 删除监控文件夹记录
+    db::remove_watch_folder(&conn, folder_id).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 /// 查询曲目列表
@@ -311,24 +383,40 @@ pub fn library_get_track_tags(
 
 /// 从音乐库删除曲目（可选是否同时删除文件）
 #[tauri::command]
-pub fn library_delete_tracks(
+pub async fn library_delete_tracks(
     track_ids: Vec<i64>,
     delete_files: bool,
     state: State<'_, Arc<Mutex<Connection>>>,
 ) -> Result<(), String> {
-    let conn = state.lock().map_err(|e| e.to_string())?;
+    // 持锁：获取路径 + DB 操作
+    let (paths, ) = {
+        let conn = state.lock().map_err(|e| e.to_string())?;
 
-    if delete_files {
-        // 先获取文件路径，删除物理文件
+        let mut paths: Vec<String> = Vec::new();
         for id in &track_ids {
             if let Ok(Some(path)) = db::get_track_path(&conn, *id) {
-                let _ = std::fs::remove_file(&path);
+                paths.push(path);
             }
+        }
+
+        if !delete_files {
+            // 仅从库移除（不删文件）→ 加入黑名单
+            db::add_excluded_paths(&conn, &paths).map_err(|e| e.to_string())?;
+        }
+
+        // 从数据库删除
+        db::delete_tracks_by_ids(&conn, &track_ids).map_err(|e| e.to_string())?;
+        (paths,)
+    };
+    // 锁已释放
+
+    // 在锁外删除物理文件（避免 I/O 阻塞 DB）
+    if delete_files {
+        for p in &paths {
+            let _ = std::fs::remove_file(p);
         }
     }
 
-    // 从数据库删除
-    db::delete_tracks_by_ids(&conn, &track_ids).map_err(|e| e.to_string())?;
     Ok(())
 }
 
