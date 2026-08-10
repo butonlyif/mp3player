@@ -4,13 +4,23 @@ import { APP_NAME } from '../branding';
 
 const appWindow = getCurrentWindow();
 
-export default function TitleBar() {
+export interface TitleBarProps {
+  onEnterMagicPill: () => void | Promise<void>;
+}
+
+export default function TitleBar({ onEnterMagicPill }: TitleBarProps) {
   const handleDragStart = (e: React.MouseEvent) => {
     // 仅左键触发拖拽
     if (e.button === 0) {
       e.preventDefault();
       appWindow.startDragging();
     }
+  };
+
+  const handleMagicPill = () => {
+    Promise.resolve(onEnterMagicPill()).catch((err) => {
+      console.error('进入魔丸模式失败:', err);
+    });
   };
 
   return (
@@ -22,6 +32,18 @@ export default function TitleBar() {
 
       {/* 右侧窗口控制按钮 */}
       <div className="titlebar-controls">
+        <button
+          className="titlebar-btn titlebar-magic-pill"
+          aria-label="进入魔丸模式"
+          title="缩小为魔丸浮窗"
+          onMouseDown={(e) => { e.stopPropagation(); }}
+          onClick={handleMagicPill}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+            <circle cx="7" cy="7" r="2.8" fill="currentColor" />
+          </svg>
+        </button>
         <button
           className="titlebar-btn"
           title="最小化"

@@ -263,10 +263,16 @@ export default function App() {
 
   // ===== 初始加载库和播放清单 =====
   useEffect(() => {
+    // 先扫描所有监控文件夹（更新新增/删除/修改的文件），再加载库
     api.library
-      .query({})
-      .then(setTracks)
-      .catch((e) => console.error('加载音乐库失败:', e));
+      .scanAll()
+      .catch((e) => console.error('启动扫描失败:', e))
+      .finally(() => {
+        api.library
+          .query({})
+          .then(setTracks)
+          .catch((e) => console.error('加载音乐库失败:', e));
+      });
     api.playlist
       .list()
       .then(setPlaylists)
@@ -291,7 +297,7 @@ export default function App() {
     playPrev();
   };
 
-  useMagicPillBridge({
+  const { enterMagicPill } = useMagicPillBridge({
     controller: magicPillController,
     trackId: currentTrackId,
     title: displayTitle,
@@ -398,7 +404,7 @@ export default function App() {
   return (
     <AppShell
       immersive={immersiveMode}
-      titleBar={<TitleBar />}
+      titleBar={<TitleBar onEnterMagicPill={enterMagicPill} />}
       sidebar={<Sidebar />}
       main={<main className="app-main">{view === 'playlist' ? <PlaylistView /> : <LibraryView />}</main>}
       drawer={(showEq || showLyrics) ? <aside className="app-drawer">{showEq ? <EqPanel /> : <LyricsPanel />}</aside> : null}

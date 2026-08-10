@@ -14,7 +14,7 @@ afterEach(cleanup);
 
 describe('Soul Play branding', () => {
   it('uses one exact application name in the custom titlebar', () => {
-    render(<TitleBar />);
+    render(<TitleBar onEnterMagicPill={vi.fn()} />);
     expect(APP_NAME).toBe('Soul Play');
     expect(screen.getByText(APP_NAME)).toBeVisible();
   });
