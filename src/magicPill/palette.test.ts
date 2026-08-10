@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { VisualPalette } from '../visualizer/palette';
 import { tuneMagicPillPalette } from './palette';
 
 describe('tuneMagicPillPalette', () => {
@@ -19,9 +20,9 @@ describe('tuneMagicPillPalette', () => {
   });
 
   it('is deterministic and does not mutate the extracted palette', () => {
-    const source = {
+    const source: VisualPalette = {
       colors: ['rgb(244 240 232)', 'rgb(224 90 72)', 'rgb(28 42 62)'],
-    } as const;
+    };
 
     const first = tuneMagicPillPalette(source);
 
